@@ -1,0 +1,3 @@
+ruckig provides CMake targets:
+    find_package(ruckig REQUIRED)
+    target_link_libraries(main PRIVATE ruckig::ruckig)
