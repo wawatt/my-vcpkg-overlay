@@ -1,0 +1,3 @@
+hpp-fcl provides CMake targets:
+    find_package(hpp-fcl REQUIRED)
+    target_link_libraries(main PRIVATE hpp-fcl::hpp-fcl)

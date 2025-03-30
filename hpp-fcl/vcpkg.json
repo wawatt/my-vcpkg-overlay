@@ -1,0 +1,26 @@
+{
+  "name": "hpp-fcl",
+  "version": "2.4.3",
+  "homepage": "https://github.com/humanoid-path-planner/hpp-fcl",
+  "description": "",
+  "license": "BSD-2-Clause",
+  "dependencies": [
+    {
+      "name" : "vcpkg-cmake",
+      "host" : true
+    },
+    {
+      "name" : "vcpkg-cmake-config",
+      "host" : true
+    },
+    "assimp",
+    "boost-chrono",
+    "boost-date-time",  
+    "boost-filesystem",
+    "boost-math",
+    "boost-serialization", 
+    "boost-thread",
+    "eigen3",
+    "octomap"
+  ]
+}
