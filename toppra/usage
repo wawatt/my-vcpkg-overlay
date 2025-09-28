@@ -1,0 +1,3 @@
+toppra provides CMake targets:
+    find_package(toppra REQUIRED)
+    target_link_libraries(main PRIVATE toppra::toppra)
