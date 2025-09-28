@@ -11,13 +11,17 @@ vcpkg_from_github(
 
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
-    OPTIONS_RELEASE -DBUILD_CLOUD_CLIENT=ON -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF
-    OPTIONS_DEBUG -DBUILD_CLOUD_CLIENT=ON -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF
+    OPTIONS 
+        -DBUILD_CLOUD_CLIENT=ON 
+        -DBUILD_EXAMPLES=OFF 
+        -DBUILD_TESTS=OFF
+    OPTIONS_DEBUG 
+        -DCMAKE_DEBUG_POSTFIX=d
 )
 
 vcpkg_cmake_install()
 
-vcpkg_cmake_config_fixup(PACKAGE_NAME "ruckig")
+vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake/ruckig)
 
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
 file(COPY "${SOURCE_PATH}/third_party/doctest" DESTINATION "${CURRENT_PACKAGES_DIR}/include/ruckig")
