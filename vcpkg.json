@@ -1,0 +1,61 @@
+{   
+    "name":"raivas",
+    
+    "dependencies": [
+        "assimp",
+        "asio",
+        "boost-locale",
+        "casadi",
+        "ccd",
+        "ceres",
+        "console-bridge",
+        "cppad",
+        "eigen3",
+        "fcl",
+        "glog",
+        "gflags",
+        "grpc",
+        "gtest",
+        "hpp-fcl",
+        "magic-enum",
+        "nlohmann-json",
+        "nu-book-zxing-cpp",
+        "octomap",
+        "ompl", 
+        {
+            "name": "opencv4",
+            "features": ["eigen","contrib","dnn","ipp","freetype","openmp","thread","tiff","opencl","vulkan","tbb"]
+        },
+        {
+            "name": "openvino",
+            "default-features": false,
+            "features": ["auto","auto-batch","cpu","gpu","ir","onnx"]
+        },
+        "orocos-kdl",
+        {
+            "name": "pcl",
+            "features": ["visualization","simulation", "surface-on-nurbs"]
+        },
+        "pinocchio",
+        "qt5-base",
+        "qt5-svg",
+        "qt5-tools",
+        "ruckig",
+        "sophus",
+        "spdlog",
+        "tinyxml",
+        "toppra",
+        "yaml-cpp",
+        "urdfdom"
+    ],
+    "overrides": [
+        {
+            "name": "eigen3",
+            "version": "3.4.0#5"
+        }
+    ],
+    "vcpkg-configuration": {
+        "overlay-triplets": [ "my-vcpkg-overlay/triplets" ],
+        "overlay-ports": [ "my-vcpkg-overlay" ]
+    }
+}
