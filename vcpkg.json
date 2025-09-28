@@ -24,7 +24,7 @@
         "ompl", 
         {
             "name": "opencv4",
-            "features": ["eigen","contrib","dnn","ipp","freetype","openmp","thread","tiff","opencl","vulkan","tbb"]
+            "features": ["eigen","contrib","dnn","ipp","freetype","openmp","thread","tiff","opencl","tbb"]
         },
         {
             "name": "openvino",
