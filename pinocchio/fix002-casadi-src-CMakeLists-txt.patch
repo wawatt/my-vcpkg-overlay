@@ -1,0 +1,11 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -349,7 +349,7 @@ endif()
+ # Define casadi target.
+ if(BUILD_WITH_CASADI_SUPPORT)
+   pinocchio_specific_type(casadi CASADI_SCOPE)
+-  target_link_libraries(${PROJECT_NAME}_casadi ${CASADI_SCOPE} casadi)
++  target_link_libraries(${PROJECT_NAME}_casadi ${CASADI_SCOPE} ${CASADI_TARGET})
+ endif()
+ 
+ if(BUILD_WITH_PYTHON_PARSER_SUPPORT)

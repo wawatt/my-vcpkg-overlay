@@ -1,6 +1,6 @@
 {
   "name": "pinocchio",
-  "version": "2.7.1",
+  "version": "3.7.0",
   "homepage": "https://github.com/stack-of-tasks/pinocchio",
   "description": "",
   "license": "BSD-2-Clause",
@@ -17,15 +17,18 @@
     "boost-filesystem",
     "boost-foreach",
     "boost-format",
+    "boost-logic",
     "boost-iostreams",
     "boost-property-tree",
     "boost-serialization", 
     "boost-system",
+    "casadi",
     "console-bridge",
     "eigen3",
     "fcl",
     "hpp-fcl",
     "octomap",
+    "qhull",
     "urdfdom-headers",
     "urdfdom"
   ]

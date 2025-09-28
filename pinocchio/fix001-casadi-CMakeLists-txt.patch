@@ -1,0 +1,34 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3c7aa2fe..da3fb305 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -260,6 +260,29 @@ endif(BUILD_WITH_AUTODIFF_SUPPORT)
+ 
+ if(BUILD_WITH_CASADI_SUPPORT)
+   add_project_dependency(casadi 3.4.5 REQUIRED PKG_CONFIG_REQUIRES "casadi >= 3.4.5")
++
++  # Normalize CasADi link target across versions.
++  # Prefer imported target (casadi::casadi), then legacy target (casadi), then library variables.
++  if(TARGET casadi::casadi)
++    set(CASADI_TARGET casadi::casadi)
++    message(STATUS "1Using CasADi target: ${CASADI_TARGET}")
++  elseif(TARGET casadi)
++    set(CASADI_TARGET casadi)
++    message(STATUS "2Using CasADi target: ${CASADI_TARGET}")
++  elseif(DEFINED CASADI_LIBRARIES)
++    set(CASADI_TARGET ${CASADI_LIBRARIES})
++    message(STATUS "3Using CasADi target: ${CASADI_TARGET}")
++  elseif(DEFINED casadi_LIBRARIES)
++    set(CASADI_TARGET ${casadi_LIBRARIES})
++    message(STATUS "4Using CasADi target: ${CASADI_TARGET}")
++  else()
++    message(FATAL_ERROR "CasADi found but no usable target or libraries variable exported.")
++  endif()
++
++  # Expose to subdirectories and cache for external use if needed.
++  set(CASADI_TARGET "${CASADI_TARGET}" CACHE STRING "CasADi target to link" FORCE)
++  message(STATUS "----------------CasADi target: ${CASADI_TARGET}")
++
+   list(APPEND LIBRARIES_DEPENDENCIES ${PROJECT_NAME}_casadi)
+ endif(BUILD_WITH_CASADI_SUPPORT)
+ 
