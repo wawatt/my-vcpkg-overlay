@@ -9,7 +9,7 @@ cd vcpkg
 git clone https://github.com/wawatt/my-vcpkg-overlay.git
 ```
 2. 全局安装
-复制my-vcpkg-overlay/vcpkg.json到vcpkg根目录
+移动my-vcpkg-overlay/vcpkg.json到vcpkg根目录
 ```shell
 ./vcpkg install
 ./vcpkg.exe export --zip --output-dir=d:/vcpkg-export --x-all-installed

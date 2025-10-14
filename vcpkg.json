@@ -1,6 +1,6 @@
 {   
     "name":"wawatt",
-    
+    "version":"1.0.0",
     "dependencies": [
         "assimp",
         "asio",
@@ -24,7 +24,7 @@
         "ompl", 
         {
             "name": "opencv4",
-            "features": ["eigen","contrib","dnn","ipp","freetype","openmp","thread","tiff","opencl","vulkan","tbb"]
+            "features": ["eigen","contrib","dnn","ipp","freetype","openmp","thread","tiff","opencl","tbb"]
         },
         {
             "name": "openvino",
@@ -52,10 +52,19 @@
         {
             "name": "eigen3",
             "version": "3.4.0#5"
+        },
+        {
+            "name": "openvino",
+            "version": "2024.5.0#0"
         }
     ],
     "vcpkg-configuration": {
         "overlay-triplets": [ "my-vcpkg-overlay/triplets" ],
-        "overlay-ports": [ "my-vcpkg-overlay" ]
+        "overlay-ports": [ "my-vcpkg-overlay" ],
+        "default-registry": {
+            "kind": "git",
+            "repository": "https://github.com/Microsoft/vcpkg",
+            "baseline": "2e6fcc44573d091af0321f99c89b212997a76f1f"
+        }
     }
 }
