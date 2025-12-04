@@ -27,7 +27,7 @@ if("${PORT}" MATCHES "boost")
     set(VCPKG_LIBRARY_LINKAGE dynamic)
 endif()
 
-if("${PORT}" MATCHES "qt5")
+if("${PORT}" MATCHES "qt")
     set(VCPKG_LIBRARY_LINKAGE dynamic)
 endif()
 
