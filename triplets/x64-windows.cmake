@@ -12,7 +12,6 @@ set(MY_SHARED_LIST
     "ompl"
     "openvino"
     "python3"
-    "pinocchio"
     "toppra"
     "zstd"
 )
@@ -20,6 +19,10 @@ list(FIND MY_SHARED_LIST "${PORT}" INDEX)
 
 # 如果INDEX大于或等于0，则字符串在列表中
 if(${INDEX} GREATER -1)
+    set(VCPKG_LIBRARY_LINKAGE dynamic)
+endif()
+
+if("${PORT}" MATCHES "pinocchio") # for pinocchio3 and pinocchio2
     set(VCPKG_LIBRARY_LINKAGE dynamic)
 endif()
 
