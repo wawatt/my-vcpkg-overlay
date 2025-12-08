@@ -1,0 +1,3 @@
+nodeeditor provides CMake targets:
+    find_package(nodeeditor REQUIRED)
+    target_link_libraries(main PRIVATE nodeeditor::nodeeditor)
