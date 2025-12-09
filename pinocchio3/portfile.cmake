@@ -30,7 +30,7 @@ vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
         -DBUILD_WITH_OPENMP_SUPPORT=ON 
-        -DBUILD_WITH_CASADI_SUPPORT=ON 
+        # -DBUILD_WITH_CASADI_SUPPORT=ON 
         -DBUILD_WITH_EXTRA_SUPPORT=ON 
         -DBUILD_WITH_OPENMP_SUPPORT=ON 
         -DBUILD_PYTHON_INTERFACE=OFF 
@@ -38,8 +38,9 @@ vcpkg_cmake_configure(
         -DBUILD_TESTING=OFF 
         -DBUILD_WITH_COLLISION_SUPPORT=ON 
         -DBUILDING_ROS2_PACKAGE=OFF
+    OPTIONS_RELEASE
         -DCMAKE_RELEASE_POSTFIX=3
-    OPTIONS_DEBUG   
+    OPTIONS_DEBUG
         -DCMAKE_DEBUG_POSTFIX=3d
 )
 
@@ -55,7 +56,34 @@ file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
 file(COPY ${CURRENT_PACKAGES_DIR}/debug/share/pinocchio/ DESTINATION ${CURRENT_PACKAGES_DIR}/share/pinocchio3)
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share/pinocchio")
 
-file(COPY ${CURRENT_PACKAGES_DIR}/include/pinocchio/ DESTINATION ${CURRENT_PACKAGES_DIR}/include/pinocchio3)
+# 复制头文件并替换 #include "pinocchio/ 为 #include "pinocchio3/
+file(GLOB_RECURSE HEADER_FILES "${CURRENT_PACKAGES_DIR}/include/pinocchio/*")
+foreach(HEADER_FILE ${HEADER_FILES})
+    # 获取相对路径
+    file(RELATIVE_PATH RELATIVE_PATH "${CURRENT_PACKAGES_DIR}/include/pinocchio" "${HEADER_FILE}")
+    
+    # 创建目标目录
+    get_filename_component(TARGET_DIR "${CURRENT_PACKAGES_DIR}/include/pinocchio3/${RELATIVE_PATH}" DIRECTORY)
+    file(MAKE_DIRECTORY "${TARGET_DIR}")
+    
+    # 如果是文本文件（.hpp, .h, .hxx等），替换内容
+    if(HEADER_FILE MATCHES "\\.(hpp|h|hxx|tpp|ipp|inl|xpp)$")
+        # 读取文件内容
+        file(READ "${HEADER_FILE}" FILE_CONTENT)
+        
+        # 替换 #include "pinocchio/ 为 #include "pinocchio3/
+        string(REPLACE "#include \"pinocchio/" "#include \"pinocchio3/" FILE_CONTENT "${FILE_CONTENT}")
+        string(REPLACE "#include <pinocchio/" "#include <pinocchio3/" FILE_CONTENT "${FILE_CONTENT}")
+
+        # 写回文件
+        file(WRITE "${CURRENT_PACKAGES_DIR}/include/pinocchio3/${RELATIVE_PATH}" "${FILE_CONTENT}")
+    else()
+        # 非头文件直接复制
+        file(COPY "${HEADER_FILE}" DESTINATION "${TARGET_DIR}")
+    endif()
+endforeach()
+
+# 删除原始的pinocchio头文件目录
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/include/pinocchio")
 
 file(INSTALL "${SOURCE_PATH}/LICENSE" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)

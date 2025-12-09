@@ -3,7 +3,7 @@
 ## 使用
 1. clone vcpkg
 ```shell
-git clone https://github.com/microsoft/vcpkg.git\
+git clone https://github.com/microsoft/vcpkg.git -b 2025.09.17
 cd vcpkg
 .\bootstrap-vcpkg.bat
 git clone https://github.com/wawatt/my-vcpkg-overlay.git

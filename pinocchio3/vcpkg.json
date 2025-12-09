@@ -22,7 +22,6 @@
     "boost-property-tree",
     "boost-serialization", 
     "boost-system",
-    "casadi",
     "console-bridge",
     "eigen3",
     "fcl",

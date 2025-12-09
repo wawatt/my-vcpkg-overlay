@@ -19,6 +19,7 @@
         "hpp-fcl",
         "magic-enum",
         "nlohmann-json",
+        "nodeeditor",
         "nu-book-zxing-cpp",
         "octomap",
         "ompl", 
@@ -36,7 +37,7 @@
             "name": "pcl",
             "features": ["visualization","simulation", "surface-on-nurbs"]
         },
-        "pinocchio2",
+        "pinocchio",
         "qt5-base",
         "qt5-svg",
         "qt5-tools",
