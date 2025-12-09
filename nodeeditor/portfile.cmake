@@ -23,9 +23,9 @@ vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
         -DUSE_QT6=OFF 
-        # -DBUILD_SHARED_LIBS=OFF
+        -DBUILD_SHARED_LIBS=ON
     OPTIONS_DEBUG   
-        -DCMAKE_DEBUG_POSTFIX=d
+        -DBUILD_DEBUG_POSTFIX_D=ON 
 )
 
 vcpkg_cmake_install()

@@ -11,6 +11,7 @@ set(MY_SHARED_LIST
     "opencv4"
     "ompl"
     "openvino"
+    "nodeeditor"
     "python3"
     "toppra"
     "zstd"
