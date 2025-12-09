@@ -35,9 +35,12 @@ vcpkg_cmake_configure(
 
 vcpkg_cmake_install()
 # vcpkg_fixup_pkgconfig()
-vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake/pinocchio)
+vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake/pinocchio2)
+vcpkg_copy_pdbs()
 
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
+# file(COPY ${CMAKE_CURRENT_LIST_DIR}/debug/include DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/mydir)
+
 # file(INSTALL "${SOURCE_PATH}/LICENSE" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)
 configure_file("${CMAKE_CURRENT_LIST_DIR}/usage" "${CURRENT_PACKAGES_DIR}/share/${PORT}/usage" COPYONLY)
 # vcpkg_fixup_pkgconfig()
