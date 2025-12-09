@@ -37,7 +37,8 @@
             "name": "pcl",
             "features": ["visualization","simulation", "surface-on-nurbs"]
         },
-        "pinocchio",
+        "pinocchio2",
+        "pinocchio3",
         "qt5-base",
         "qt5-svg",
         "qt5-tools",
