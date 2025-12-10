@@ -74,6 +74,7 @@ foreach(HEADER_FILE ${HEADER_FILES})
         # 替换 #include "pinocchio/ 为 #include "pinocchio3/
         string(REPLACE "#include \"pinocchio/" "#include \"pinocchio3/" FILE_CONTENT "${FILE_CONTENT}")
         string(REPLACE "#include <pinocchio/" "#include <pinocchio3/" FILE_CONTENT "${FILE_CONTENT}")
+        string(REPLACE " \"pinocchio/" " \"pinocchio3/" FILE_CONTENT "${FILE_CONTENT}")
 
         # 写回文件
         file(WRITE "${CURRENT_PACKAGES_DIR}/include/pinocchio3/${RELATIVE_PATH}" "${FILE_CONTENT}")
