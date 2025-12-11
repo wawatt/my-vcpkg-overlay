@@ -29,6 +29,7 @@
     "octomap",
     "qhull",
     "urdfdom-headers",
-    "urdfdom"
+    "urdfdom",
+    "pinocchio3"
   ]
 }

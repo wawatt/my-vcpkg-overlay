@@ -51,10 +51,12 @@ vcpkg_copy_pdbs()
 
 file(COPY ${CURRENT_PACKAGES_DIR}/share/pinocchio/ DESTINATION ${CURRENT_PACKAGES_DIR}/share/pinocchio3)
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/share/pinocchio")
+file(RENAME ${CURRENT_PACKAGES_DIR}/lib/pkgconfig/pinocchio.pc ${CURRENT_PACKAGES_DIR}/lib/pkgconfig/pinocchio3.pc)
+
 # debug
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
-file(COPY ${CURRENT_PACKAGES_DIR}/debug/share/pinocchio/ DESTINATION ${CURRENT_PACKAGES_DIR}/share/pinocchio3)
-file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share/pinocchio")
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share")
+file(RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/pkgconfig/pinocchio.pc ${CURRENT_PACKAGES_DIR}/debug/lib/pkgconfig/pinocchio3.pc)
 
 # 复制头文件并替换 #include "pinocchio/ 为 #include "pinocchio3/
 file(GLOB_RECURSE HEADER_FILES "${CURRENT_PACKAGES_DIR}/include/pinocchio/*")

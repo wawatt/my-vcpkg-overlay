@@ -45,8 +45,7 @@ vcpkg_copy_pdbs()
 # file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/share/pinocchio")
 # debug
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
-# file(COPY ${CURRENT_PACKAGES_DIR}/debug/share/pinocchio/ DESTINATION ${CURRENT_PACKAGES_DIR}/debug/share/pinocchio2)
-# file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share/pinocchio")
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share")
 
 # file(COPY ${CURRENT_PACKAGES_DIR}/include/pinocchio/ DESTINATION ${CURRENT_PACKAGES_DIR}/include/pinocchio2)
 # file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/include/pinocchio")
