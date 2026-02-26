@@ -5,9 +5,21 @@
         "assimp",
         "asio",
         "boost-locale",
+        "boost-dll",
+        "boost-stacktrace",
+        {
+            "name": "bullet3",
+            "features": ["multithreading","double-precision","rtti"]
+        },
         "casadi",
-        "ccd",
-        "ceres",
+        {
+            "name": "ccd",
+            "features": ["double-precision"]
+        },
+        {
+            "name": "ceres",
+            "features": ["eigensparse", "lapack", "suitesparse"]
+        },
         "console-bridge",
         "cppad",
         "eigen3",
@@ -22,7 +34,7 @@
         "nodeeditor",
         "nu-book-zxing-cpp",
         "octomap",
-        "ompl", 
+        "ompl",
         {
             "name": "opencv4",
             "features": ["eigen","contrib","dnn","ipp","freetype","openmp","thread","tiff","opencl","tbb"]
@@ -37,8 +49,8 @@
             "name": "pcl",
             "features": ["visualization","simulation", "surface-on-nurbs"]
         },
-        "pinocchio",
         "pinocchio3",
+        "pinocchio",
         "qt5-base",
         "qt5-svg",
         "qt5-tools",
