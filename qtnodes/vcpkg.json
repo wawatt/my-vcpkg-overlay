@@ -1,6 +1,6 @@
 {
-  "name": "nodeeditor",
-  "version": "3.0.12",
+  "name": "qtnodes",
+  "version": "3.0.14",
   "homepage": "https://github.com/paceholder/nodeeditor.git",
   "description": "",
   "license": "BSD-3-Clause",
@@ -13,6 +13,6 @@
       "name" : "vcpkg-cmake-config",
       "host" : true
     },
-    "qt5-base"
+    "qtbase"
   ]
 }

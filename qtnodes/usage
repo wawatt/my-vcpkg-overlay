@@ -1,0 +1,3 @@
+QtNodes provides CMake targets:
+    find_package(QtNodes REQUIRED)
+    target_link_libraries(main PRIVATE QtNodes::QtNodes)

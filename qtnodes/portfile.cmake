@@ -3,7 +3,7 @@ vcpkg_download_distfile(
     ARCHIVE 
     URLS "https://codeload.github.com/paceholder/nodeeditor/tar.gz/refs/tags/${VERSION}"
     FILENAME "nodeeditor-${VERSION}.tar.gz"
-    SHA512 604b4597c5eb9a2761e287eff4825b6ea6901e6eaea19b61e320064e366ff9f266211fea4f5fd745daac0b312739a8d43697cfdefbaaaf00d3fa55bf8958e5cc  # 先填0，安装后会得到正确值
+    SHA512 3254f8683b458c72221d9416240df09a6443bc12543a6ac83c400958ed975139b39d64a07e913a47b41d71b76a225233c8dc8c245d2453e141c8ed4d88bc1507  # 先填0，安装后会得到正确值
 )
 
 # 解压下载的文件
@@ -22,10 +22,11 @@ vcpkg_extract_source_archive(
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
-        -DUSE_QT6=OFF 
-        -DBUILD_SHARED_LIBS=ON
+        -DUSE_QT6=ON
+        -DBUILD_SHARED_LIBS=OFF
+        -DCMAKE_CXX_STANDARD=17
     OPTIONS_DEBUG   
-        -DBUILD_DEBUG_POSTFIX_D=ON 
+        -DBUILD_DEBUG_POSTFIX_D=ON
 )
 
 vcpkg_cmake_install()
