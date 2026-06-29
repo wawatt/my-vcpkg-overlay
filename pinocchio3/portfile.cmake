@@ -69,7 +69,7 @@ foreach(HEADER_FILE ${HEADER_FILES})
     file(MAKE_DIRECTORY "${TARGET_DIR}")
     
     # 如果是文本文件（.hpp, .h, .hxx等），替换内容
-    if(HEADER_FILE MATCHES "\\.(hpp|h|hxx|tpp|ipp|inl|xpp)$")
+    if(HEADER_FILE MATCHES "\\.(hpp|h|hxx|tpp|ipp|inl|xpp|txx)$")
         # 读取文件内容
         file(READ "${HEADER_FILE}" FILE_CONTENT)
         
