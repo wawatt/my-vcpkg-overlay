@@ -1,86 +1,127 @@
-{   
-    "name":"wawatt",
-    "version":"1.0.0",
-    "dependencies": [
-        "assimp",
-        "asio",
-        "boost-locale",
-        "boost-dll",
-        "boost-stacktrace",
-        {
-            "name": "bullet3",
-            "features": ["multithreading","double-precision","rtti"]
-        },
-        "casadi",
-        {
-            "name": "ccd",
-            "features": ["double-precision"]
-        },
-        {
-            "name": "ceres",
-            "features": ["eigensparse", "lapack", "suitesparse"]
-        },
-        "console-bridge",
-        "cppad",
-        "eigen3",
-        "fcl",
-        "glog",
-        "gflags",
-        "grpc",
-        "gtest",
-        "hpp-fcl",
-        "jsoncpp",
-        "magic-enum",
-        "nlohmann-json",
-        "nu-book-zxing-cpp",
-        "octomap",
-        "ompl",
-        {
-            "name": "opencv4",
-            "features": ["eigen","contrib","dnn","ipp","freetype","openmp","thread","tiff","opencl","tbb"]
-        },
-        {
-            "name": "openvino",
-            "default-features": false,
-            "features": ["auto","auto-batch","cpu","gpu","ir","onnx"]
-        },
-        "orocos-kdl",
-        {
-            "name": "pcl",
-            "features": ["visualization","simulation", "surface-on-nurbs"]
-        },
-        "pinocchio3",
-        "pinocchio",
-        "qt5-base",
-        "qt5-svg",
-        "qt5-tools",
-        "qtbase",
-        "qtnodes",
-        "sophus",
-        "spdlog",
-        "taskflow",
-        "tinyxml",
-        "toppra",
-        "yaml-cpp",
-        "urdfdom"
+{
+  "vcpkg-configuration": {
+    "default-registry": {
+      "kind": "git",
+      "baseline": "2e6fcc44573d091af0321f99c89b212997a76f1f",
+      "repository": "https://github.com/Microsoft/vcpkg"
+    },
+    "overlay-ports": [
+      "my-vcpkg-overlay"
     ],
-    "overrides": [
-        {
-            "name": "eigen3",
-            "version": "3.4.0#5"
-        },
-        {
-            "name": "openvino",
-            "version": "2025.3.0"
-        }
-    ],
-    "vcpkg-configuration": {
-        "overlay-triplets": [ "my-vcpkg-overlay/triplets" ],
-        "overlay-ports": [ "my-vcpkg-overlay" ],
-        "default-registry": {
-            "kind": "git",
-            "repository": "https://github.com/Microsoft/vcpkg",
-            "baseline": "2e6fcc44573d091af0321f99c89b212997a76f1f"
-        }
+    "overlay-triplets": [
+      "my-vcpkg-overlay/triplets"
+    ]
+  },
+  "name": "wawatt",
+  "version": "1.0.0",
+  "dependencies": [
+    "asio",
+    "assimp",
+    "boost-dll",
+    "boost-locale",
+    "boost-stacktrace",
+    {
+      "name": "bullet3",
+      "features": [
+        "double-precision",
+        "multithreading",
+        "rtti"
+      ]
+    },
+    "casadi",
+    {
+      "name": "ccd",
+      "features": [
+        "double-precision"
+      ]
+    },
+    {
+      "name": "ceres",
+      "features": [
+        "eigensparse",
+        "lapack",
+        "suitesparse"
+      ]
+    },
+    "console-bridge",
+    "cppad",
+    "eigen3",
+    "fcl",
+    "fftw3",
+    "gflags",
+    "glog",
+    "grpc",
+    "gtest",
+    "hpp-fcl",
+    "jsoncpp",
+    "magic-enum",
+    "nlohmann-json",
+    "nu-book-zxing-cpp",
+    "octomap",
+    "ompl",
+    {
+      "name": "opencv4",
+      "features": [
+        "contrib",
+        "dnn",
+        "eigen",
+        "freetype",
+        "ipp",
+        "opencl",
+        "openmp",
+        "tbb",
+        "thread",
+        "tiff"
+      ]
+    },
+    {
+      "name": "openvino",
+      "default-features": false,
+      "features": [
+        "auto",
+        "auto-batch",
+        "cpu",
+        "gpu",
+        "hetero",
+        "ir",
+        "onnx"
+      ]
+    },
+    "orocos-kdl",
+    {
+      "name": "pcl",
+      "features": [
+        "simulation",
+        "surface-on-nurbs",
+        "visualization"
+      ]
+    },
+    "pinocchio3",
+    "qt5-base",
+    "qt5-svg",
+    "qt5-tools",
+    "qtbase",
+    "qtnodes",
+    "sophus",
+    "spdlog",
+    "taskflow",
+    "tinyxml",
+    "toppra",
+    "urdfdom",
+    "yaml-cpp"
+  ],
+  "overrides": [
+    {
+      "name": "eigen3",
+      "version": "3.4.0#5"
+    },
+    {
+      "name": "level-zero",
+      "version": "1.32.0#1"
+    },
+    {
+      "name": "openvino",
+      "version": "2026.1.0#1"
     }
+  ]
 }

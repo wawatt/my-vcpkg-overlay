@@ -22,6 +22,7 @@
     "boost-property-tree",
     "boost-serialization", 
     "boost-system",
+    "cppad",
     "console-bridge",
     "eigen3",
     "fcl",
