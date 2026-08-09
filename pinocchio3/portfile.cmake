@@ -56,7 +56,9 @@ file(RENAME ${CURRENT_PACKAGES_DIR}/lib/pkgconfig/pinocchio.pc ${CURRENT_PACKAGE
 # debug
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share")
-file(RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/pkgconfig/pinocchio.pc ${CURRENT_PACKAGES_DIR}/debug/lib/pkgconfig/pinocchio3.pc)
+if(EXISTS "${CURRENT_PACKAGES_DIR}/debug/lib/pkgconfig/pinocchio.pc")
+    file(RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/pkgconfig/pinocchio.pc ${CURRENT_PACKAGES_DIR}/debug/lib/pkgconfig/pinocchio3.pc)
+endif()
 
 # 复制头文件并替换 #include "pinocchio/ 为 #include "pinocchio3/
 file(GLOB_RECURSE HEADER_FILES "${CURRENT_PACKAGES_DIR}/include/pinocchio/*")
