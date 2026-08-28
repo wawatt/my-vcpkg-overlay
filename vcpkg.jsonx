@@ -45,6 +45,7 @@
     },
     "console-bridge",
     "cppad",
+    "cppzmq",
     "eigen3",
     "fcl",
     "fftw3",
@@ -54,6 +55,7 @@
     "gtest",
     "hpp-fcl",
     "jsoncpp",
+    "libpcap",
     "magic-enum",
     "nlohmann-json",
     "nu-book-zxing-cpp",
@@ -104,11 +106,14 @@
     "qtnodes",
     "sophus",
     "spdlog",
+    "robotraconteur",
+    "robotraconteur-companion",
     "taskflow",
     "tinyxml",
     "toppra",
     "urdfdom",
-    "yaml-cpp"
+    "yaml-cpp",
+    "zeromq"
   ],
   "overrides": [
     {

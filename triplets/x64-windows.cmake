@@ -7,6 +7,7 @@ set(MY_SHARED_LIST
     "casadi"
     "hpp-fcl"
     "fcl"
+    "level-zero"
     "onnxruntime-gpu"
     "opencv4"
     "ompl"
