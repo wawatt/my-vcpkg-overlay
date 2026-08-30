@@ -1,0 +1,12 @@
+tesseract-planning provides CMake targets.
+The CMake package name is tesseract_planning (not the vcpkg port name):
+
+  find_package(tesseract_planning CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE
+      tesseract::command_language
+      tesseract::motion_planners_ompl
+      tesseract::motion_planners_trajopt
+      tesseract::motion_planners_descartes
+      tesseract::task_composer)
+
+Config files live in share/tesseract_planning/. Plugin DLLs are in bin/; put that directory on PATH at runtime.

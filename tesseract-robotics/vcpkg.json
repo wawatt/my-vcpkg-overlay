@@ -1,0 +1,83 @@
+{
+  "name": "tesseract-robotics",
+  "version": "0.35.0",
+  "description": "ROS-agnostic motion planning environment: scene graph, collision, kinematics, and URDF",
+  "homepage": "https://github.com/tesseract-robotics/tesseract",
+  "license": "Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause",
+  "supports": "windows",
+  "dependencies": [
+    "assimp",
+    "boost-dll",
+    "boost-filesystem",
+    "boost-graph",
+    "boost-program-options",
+    "boost-stacktrace",
+    "boost-system",
+    "boost-plugin-loader",
+    {
+      "name": "bullet3",
+      "features": [
+        "double-precision",
+        "multithreading",
+        "rtti"
+      ]
+    },
+    {
+      "name": "ccd",
+      "features": [
+        "double-precision"
+      ]
+    },
+    "cereal",
+    "console-bridge",
+    "eigen3",
+    "octomap",
+    "orocos-kdl",
+    "pcl",
+    "ros-industrial-cmake-boilerplate",
+    "tinyxml2",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    },
+    "yaml-cpp"
+  ],
+  "default-features": [
+    "fcl",
+    "ikfast",
+    "kdl",
+    "opw",
+    "ur",
+    "vhacd"
+  ],
+  "features": {
+    "fcl": {
+      "description": "FCL contact managers",
+      "dependencies": [
+        "fcl"
+      ]
+    },
+    "ikfast": {
+      "description": "IKFast kinematics plugins"
+    },
+    "kdl": {
+      "description": "KDL kinematics plugins"
+    },
+    "opw": {
+      "description": "OPW closed-form inverse kinematics plugins",
+      "dependencies": [
+        "opw-kinematics"
+      ]
+    },
+    "ur": {
+      "description": "Universal Robots kinematics plugins"
+    },
+    "vhacd": {
+      "description": "VHACD convex decomposition"
+    }
+  }
+}

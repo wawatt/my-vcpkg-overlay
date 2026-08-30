@@ -1,0 +1,17 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f143bdc..3743af6 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -47,8 +47,10 @@ target_code_coverage(
+   ALL
+   ENABLE ${ENABLE_CODE_COVERAGE})
+ 
+-# Build examples
+-add_subdirectory(examples)
++option(BUILD_EXAMPLES "Build examples" OFF)
++if(BUILD_EXAMPLES)
++  add_subdirectory(examples)
++endif()
+ 
+ # Install headers
+ install(DIRECTORY include/${PROJECT_NAME}/ DESTINATION include/${PROJECT_NAME})

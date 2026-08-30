@@ -16,6 +16,11 @@ set(MY_SHARED_LIST
     "python3"
     "toppra"
     "zstd"
+    "boost-plugin-loader"
+    "tesseract-robotics"
+    "tesseract-planning"
+    "descartes-light"
+    "trajopt"
 )
 list(FIND MY_SHARED_LIST "${PORT}" INDEX)
 

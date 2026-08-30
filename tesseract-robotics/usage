@@ -1,0 +1,7 @@
+tesseract-robotics provides CMake targets.
+The CMake package name is tesseract (not tesseract-ocr, and not the vcpkg port name):
+
+  find_package(tesseract CONFIG REQUIRED COMPONENTS common environment)
+  target_link_libraries(main PRIVATE tesseract::environment)
+
+Config files live in share/tesseract/. Plugin DLLs are in bin/; put that directory on PATH at runtime.

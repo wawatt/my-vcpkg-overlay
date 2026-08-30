@@ -1,0 +1,74 @@
+{
+  "name": "tesseract-planning",
+  "version": "0.35.0",
+  "description": "Tesseract motion planning: OMPL, TrajOpt, Descartes, Ruckig, and Taskflow",
+  "homepage": "https://github.com/tesseract-robotics/tesseract_planning",
+  "license": "Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause",
+  "supports": "windows",
+  "dependencies": [
+    "boost-plugin-loader",
+    "boost-uuid",
+    "cereal",
+    "console-bridge",
+    "eigen3",
+    "ros-industrial-cmake-boilerplate",
+    "tesseract-robotics",
+    "yaml-cpp",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ],
+  "default-features": [
+    "descartes",
+    "ompl",
+    "ruckig",
+    "taskflow",
+    "trajopt",
+    "trajopt-ifopt"
+  ],
+  "features": {
+    "descartes": {
+      "description": "Descartes Cartesian planner",
+      "dependencies": [
+        "descartes-light"
+      ]
+    },
+    "ompl": {
+      "description": "OMPL sampling-based planner",
+      "dependencies": [
+        "ompl"
+      ]
+    },
+    "ruckig": {
+      "description": "Ruckig time parameterization",
+      "dependencies": [
+        "nlohmann-json",
+        "ruckig"
+      ]
+    },
+    "taskflow": {
+      "description": "Taskflow executor for task composer",
+      "dependencies": [
+        "taskflow"
+      ]
+    },
+    "trajopt": {
+      "description": "TrajOpt sequential convex planner",
+      "dependencies": [
+        "osqp",
+        "trajopt"
+      ]
+    },
+    "trajopt-ifopt": {
+      "description": "TrajOpt IFOPT planner",
+      "dependencies": [
+        "trajopt"
+      ]
+    }
+  }
+}

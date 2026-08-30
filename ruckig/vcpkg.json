@@ -5,6 +5,7 @@
     "description": "Instantaneous Motion Generation for Robots and Machines.",
     "license": "MIT",
     "dependencies": [
+      "nlohmann-json",
       {
         "name" : "vcpkg-cmake",
         "host" : true

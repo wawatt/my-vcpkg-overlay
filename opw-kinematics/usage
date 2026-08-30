@@ -1,0 +1,4 @@
+opw-kinematics provides CMake targets:
+
+  find_package(opw_kinematics CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE opw_kinematics::opw_kinematics)

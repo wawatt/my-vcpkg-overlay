@@ -1,0 +1,20 @@
+{
+  "name": "opw-kinematics",
+  "version": "0.5.5",
+  "description": "Closed-form inverse kinematics for industrial 6-axis spherical-wrist robots",
+  "homepage": "https://github.com/Jmeyer1292/opw_kinematics",
+  "license": "Apache-2.0",
+  "supports": "windows",
+  "dependencies": [
+    "eigen3",
+    "ros-industrial-cmake-boilerplate",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}

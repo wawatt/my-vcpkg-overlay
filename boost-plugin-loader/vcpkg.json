@@ -1,0 +1,22 @@
+{
+  "name": "boost-plugin-loader",
+  "version": "0.4.3",
+  "description": "Plugin loading library based on Boost.DLL",
+  "homepage": "https://github.com/tesseract-robotics/boost_plugin_loader",
+  "license": "Apache-2.0",
+  "supports": "windows",
+  "dependencies": [
+    "boost-algorithm",
+    "boost-dll",
+    "boost-filesystem",
+    "ros-industrial-cmake-boilerplate",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}

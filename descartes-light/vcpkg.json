@@ -1,0 +1,22 @@
+{
+  "name": "descartes-light",
+  "version": "0.4.10",
+  "description": "Lightweight Cartesian path planner for industrial robots",
+  "homepage": "https://github.com/swri-robotics/descartes_light",
+  "license": "Apache-2.0",
+  "supports": "windows",
+  "dependencies": [
+    "boost-graph",
+    "console-bridge",
+    "eigen3",
+    "ros-industrial-cmake-boilerplate",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6d3adc9..4ba1c04 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -37,21 +37,6 @@ target_include_directories(${PROJECT_NAME} INTERFACE "$<BUILD_INTERFACE:${CMAKE_
+                                                      "$<INSTALL_INTERFACE:include>")
+ target_include_directories(${PROJECT_NAME} SYSTEM INTERFACE ${EIGEN3_INCLUDE_DIRS})
+ 
+-# Create test executable
+-add_executable(${PROJECT_NAME}_node src/test.cpp)
+-target_link_libraries(${PROJECT_NAME}_node PRIVATE ${PROJECT_NAME})
+-set_target_properties(${PROJECT_NAME}_node PROPERTIES OUTPUT_NAME node PREFIX "")
+-target_cxx_version(${PROJECT_NAME}_node PRIVATE VERSION ${OPW_CXX_VERSION})
+-target_compile_options(${PROJECT_NAME}_node PRIVATE ${OPW_COMPILE_OPTIONS_PRIVATE})
+-target_clang_tidy(${PROJECT_NAME}_node ENABLE ${OPW_ENABLE_CLANG_TIDY})
+-target_include_what_you_use(${PROJECT_NAME}_node ENABLE ${OPW_ENABLE_TESTING} ARGUMENTS ${DEFAULT_IWYU_ARGS})
+-target_cppcheck(${PROJECT_NAME}_node ENABLE ${OPW_ENABLE_TESTING} ARGUMENTS ${DEFAULT_CPPCHECK_ARGS})
+-target_code_coverage(
+-  ${PROJECT_NAME}_node
+-  PRIVATE
+-  ALL
+-  ENABLE ${OPW_ENABLE_CODE_COVERAGE})
+-
+ # Install
+ configure_package(NAMESPACE opw_kinematics TARGETS ${PROJECT_NAME} DEPENDENCIES Eigen3)
+ 

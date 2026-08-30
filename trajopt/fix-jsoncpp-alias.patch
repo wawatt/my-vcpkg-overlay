@@ -1,0 +1,45 @@
+diff --git a/trajopt/CMakeLists.txt b/trajopt/CMakeLists.txt
+index 1111111..2222222 100644
+--- a/trajopt/CMakeLists.txt
++++ b/trajopt/CMakeLists.txt
+@@ -16,7 +16,8 @@ find_package(trajopt_common REQUIRED)
+ find_package(tesseract REQUIRED COMPONENTS common environment visualization)
+ if(NOT TARGET JsonCpp::JsonCpp)
+   find_package(jsoncpp REQUIRED)
+-elseif(NOT TARGET jsoncpp_lib)
++endif()
++if(TARGET JsonCpp::JsonCpp AND NOT TARGET jsoncpp_lib)
+   add_library(jsoncpp_lib ALIAS JsonCpp::JsonCpp)
+ endif()
+ find_package(ros_industrial_cmake_boilerplate REQUIRED)
+diff --git a/trajopt_sco/CMakeLists.txt b/trajopt_sco/CMakeLists.txt
+index 33cb15f..d07c895 100644
+--- a/trajopt_sco/CMakeLists.txt
++++ b/trajopt_sco/CMakeLists.txt
+@@ -17,7 +17,11 @@ find_package(Eigen3 REQUIRED)
+ find_package(trajopt_common REQUIRED)
+ if(NOT TARGET JsonCpp::JsonCpp)
+   find_package(jsoncpp REQUIRED)
+-elseif(NOT TARGET jsoncpp_lib)
++endif()
++if(TARGET JsonCpp::JsonCpp AND NOT TARGET jsoncpp_lib)
+   add_library(jsoncpp_lib ALIAS JsonCpp::JsonCpp)
+ endif()
++if(NOT TARGET osqp::osqp AND TARGET osqp::osqpstatic)
++  add_library(osqp::osqp ALIAS osqp::osqpstatic)
++endif()
+ find_package(ros_industrial_cmake_boilerplate REQUIRED)
+diff --git a/trajopt_optimizers/trajopt_sqp/CMakeLists.txt b/trajopt_optimizers/trajopt_sqp/CMakeLists.txt
+index 1111111..2222222 100644
+--- a/trajopt_optimizers/trajopt_sqp/CMakeLists.txt
++++ b/trajopt_optimizers/trajopt_sqp/CMakeLists.txt
+@@ -11,6 +11,9 @@ endif()
+ 
+ find_package(console_bridge REQUIRED)
+ find_package(OsqpEigen REQUIRED)
++if(NOT TARGET osqp::osqp AND TARGET osqp::osqpstatic)
++  add_library(osqp::osqp ALIAS osqp::osqpstatic)
++endif()
+ find_package(trajopt_ifopt REQUIRED)
+ find_package(trajopt_common REQUIRED)
+ find_package(ros_industrial_cmake_boilerplate REQUIRED)

@@ -1,0 +1,35 @@
+{
+  "name": "trajopt",
+  "version": "0.35.0",
+  "description": "Trajectory optimization motion planner used by Tesseract Planning",
+  "homepage": "https://github.com/ros-industrial-consortium/trajopt_ros",
+  "license": "BSD-2-Clause",
+  "supports": "windows",
+  "dependencies": [
+    "boost-format",
+    "boost-program-options",
+    {
+      "name": "bullet3",
+      "features": [
+        "double-precision",
+        "multithreading",
+        "rtti"
+      ]
+    },
+    "console-bridge",
+    "eigen3",
+    "jsoncpp",
+    "osqp",
+    "osqp-eigen",
+    "ros-industrial-cmake-boilerplate",
+    "tesseract-robotics",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}

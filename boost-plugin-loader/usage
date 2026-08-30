@@ -1,0 +1,4 @@
+boost-plugin-loader provides CMake targets:
+
+  find_package(boost_plugin_loader CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE boost_plugin_loader::boost_plugin_loader)

@@ -1,0 +1,7 @@
+trajopt provides CMake targets:
+
+  find_package(trajopt CONFIG REQUIRED)
+  find_package(trajopt_sco CONFIG REQUIRED)
+  find_package(trajopt_ifopt CONFIG REQUIRED)
+  find_package(trajopt_sqp CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE trajopt::trajopt trajopt::trajopt_sco)

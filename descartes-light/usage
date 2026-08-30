@@ -1,0 +1,4 @@
+descartes-light provides CMake targets:
+
+  find_package(descartes_light CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE descartes_light::descartes_light)
