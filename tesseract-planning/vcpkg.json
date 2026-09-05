@@ -39,7 +39,7 @@
       ]
     },
     "ompl": {
-      "description": "OMPL sampling-based planner",
+      "description": "OMPL sampling-based planner (overlay ompl 2.0.2 + VAMP)",
       "dependencies": [
         "ompl"
       ]

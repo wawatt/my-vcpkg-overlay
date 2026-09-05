@@ -1,0 +1,2155 @@
+diff --git a/cmake/CompilerSettings.cmake b/cmake/CompilerSettings.cmake
+index bb82131..5a4bd4d 100644
+--- a/cmake/CompilerSettings.cmake
++++ b/cmake/CompilerSettings.cmake
+@@ -1,8 +1,17 @@
+ # Allow users to override VAMP_ARCH (e.g., for Docker builds targeting different hardware)
++set(_VAMP_IS_X86 FALSE)
++if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
++	set(_VAMP_IS_X86 TRUE)
++endif()
++
+ if(NOT DEFINED VAMP_ARCH)
+-	if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+-		# Need explicit AVX2 for some MacOS clang versions
+-		set(VAMP_ARCH "-march=native -mavx2")
++	if(_VAMP_IS_X86)
++		if(MSVC)
++			set(VAMP_ARCH "/arch:AVX2")
++		else()
++			# Need explicit AVX2 for some MacOS clang versions
++			set(VAMP_ARCH "-march=native -mavx2")
++		endif()
+ 	elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+ 		# ARM platforms (aarch64 / arm64)
+ 		set(VAMP_ARCH "-mcpu=native -mtune=native")
+@@ -15,10 +24,17 @@ if(NOT DEFINED VAMP_ARCH)
+ 	endif()
+ endif()
+ 
++if(MSVC)
++	# cl.exe / clang-cl do not accept GCC warning or -f/-m/-O3 flags.
++	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${VAMP_ARCH} /permissive- /bigobj")
++	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${VAMP_ARCH}")
++	return()
++endif()
++
+ # default fast args that work on all platforms
+ set(VAMP_FAST_ARGS "-fno-math-errno -fno-signed-zeros -fno-trapping-math -fno-rounding-math -ffp-contract=fast")
+ 
+-if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64") # x86 supports additional flags
++if(_VAMP_IS_X86) # x86 supports additional flags
+ 	string(APPEND VAMP_FAST_ARGS " -fassociative-math")
+ 	if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang") # Clang supports additional fine-grained flags over GCC
+ 		string(APPEND VAMP_FAST_ARGS " -fno-honor-infinities -fno-honor-nans")
+@@ -40,7 +56,7 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -O0")
+ set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -g")
+ set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 ${VAMP_FAST_ARGS}")
+ 
+-if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
++if(_VAMP_IS_X86)
+ 	# Valgrind can't handle avx512 instructions
+ 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -mno-avx512f")
+ 	set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -mno-avx512f")
+@@ -56,4 +72,3 @@ if(VAMP_LTO)
+ 		set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -flto=auto")
+ 	endif()
+ endif()
+-
+diff --git a/cmake/Dependencies.cmake b/cmake/Dependencies.cmake
+index 9aa5eff..059a485 100644
+--- a/cmake/Dependencies.cmake
++++ b/cmake/Dependencies.cmake
+@@ -52,6 +52,10 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "
+       VERSION ${PROJECT_VERSION}
+       SOVERSION ${PROJECT_VERSION_MAJOR}
+     )
++
++    if(MSVC)
++      target_compile_options(simdxorshift PRIVATE /arch:AVX2)
++    endif()
+     
+     # SIMDxorshift target created successfully
+   endif()
+diff --git a/src/impl/vamp/bindings/robot_helper.hh b/src/impl/vamp/bindings/robot_helper.hh
+index d6c4d30..ca4f837 100644
+--- a/src/impl/vamp/bindings/robot_helper.hh
++++ b/src/impl/vamp/bindings/robot_helper.hh
+@@ -7,7 +7,7 @@
+ #include <vamp/random/rng.hh>
+ #include <vamp/random/halton.hh>
+ 
+-#if defined(__x86_64__)
++#if defined(__x86_64__) || defined(_M_X64)
+ #include <vamp/random/xorshift.hh>
+ #else
+ #include <stdexcept>
+@@ -441,7 +441,7 @@ namespace vamp::binding
+             { return std::make_shared<planning::ProlateHyperspheroidRNG<Robot>>(phs, rng); },
+             "Creates a new PHS sampler.");
+ 
+-#if defined(__x86_64__)
++#if defined(__x86_64__) || defined(_M_X64)
+         submodule.def(
+             "xorshift",
+             []() -> typename RNG::Ptr { return std::make_shared<vamp::rng::XORShift<Robot>>(); },
+diff --git a/src/impl/vamp/collision/filter.hh b/src/impl/vamp/collision/filter.hh
+index aca08e2..f0986f4 100644
+--- a/src/impl/vamp/collision/filter.hh
++++ b/src/impl/vamp/collision/filter.hh
+@@ -6,8 +6,9 @@
+ #include <cstdint>
+ 
+ #include <pdqsort.h>
++#include <vamp/compiler.hh>
+ 
+-#if defined(__x86_64__)
++#if defined(__x86_64__) || defined(_M_X64)
+ #include <immintrin.h>
+ #endif
+ 
+@@ -126,7 +127,7 @@ namespace vamp::collision
+ 
+     constexpr const uint32_t MORTON_FACTOR = 1000;
+ 
+-    inline constexpr auto remap_point(float x, float min, float max) -> uint32_t
++    inline VAMP_CONSTEXPR auto remap_point(float x, float min, float max) -> uint32_t
+     {
+         return ((x - min) / (max - min)) * static_cast<float>(MORTON_FACTOR);
+     }
+@@ -145,7 +146,7 @@ namespace vamp::collision
+         return answer;
+     }
+ 
+-#if defined(__x86_64__)
++#if defined(__x86_64__) || defined(_M_X64)
+     inline auto morton_pdep(uint32_t x, uint32_t y, uint32_t z) -> uint32_t
+     {
+         return _pdep_u32(x, MORTON_X_MASK) | _pdep_u32(y, MORTON_Y_MASK) | _pdep_u32(z, MORTON_Z_MASK);
+diff --git a/src/impl/vamp/collision/math.hh b/src/impl/vamp/collision/math.hh
+index e62cb84..58afc86 100644
+--- a/src/impl/vamp/collision/math.hh
++++ b/src/impl/vamp/collision/math.hh
+@@ -2,19 +2,20 @@
+ 
+ #include <algorithm>
+ #include <cmath>
++#include <vamp/compiler.hh>
+ 
+ namespace vamp::collision
+ {
+     using Point = std::array<float, 3>;
+ 
+     template <typename DataT>
+-    inline constexpr auto dot_2(const DataT &ax, const DataT &ay, const DataT &bx, const DataT &by) -> DataT
++    inline VAMP_CONSTEXPR auto dot_2(const DataT &ax, const DataT &ay, const DataT &bx, const DataT &by) -> DataT
+     {
+         return (ax * bx) + (ay * by);
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto dot_3(
++    inline VAMP_CONSTEXPR auto dot_3(
+         const DataT &ax,
+         const DataT &ay,
+         const DataT &az,
+@@ -26,7 +27,7 @@ namespace vamp::collision
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto sql2_3(
++    inline VAMP_CONSTEXPR auto sql2_3(
+         const DataT &ax,
+         const DataT &ay,
+         const DataT &az,
+@@ -42,25 +43,25 @@ namespace vamp::collision
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto clamp(const DataT &v, const DataT &lower, const DataT &upper) -> DataT
++    inline VAMP_CONSTEXPR auto clamp(const DataT &v, const DataT &lower, const DataT &upper) -> DataT
+     {
+         return v.clamp(lower, upper);
+     }
+ 
+     template <>
+-    inline constexpr auto clamp<float>(const float &v, const float &lower, const float &upper) -> float
++    inline VAMP_CONSTEXPR auto clamp<float>(const float &v, const float &lower, const float &upper) -> float
+     {
+         return std::max(std::min(v, upper), lower);
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto sqrt(const DataT &v) -> DataT
++    inline auto sqrt(const DataT &v) -> DataT
+     {
+         return v.sqrt();
+     }
+ 
+     template <>
+-    inline constexpr auto sqrt<float>(const float &v) -> float
++    inline auto sqrt<float>(const float &v) -> float
+     {
+         return std::sqrt(v);
+     }
+diff --git a/src/impl/vamp/collision/shapes.hh b/src/impl/vamp/collision/shapes.hh
+index 19b001b..9554390 100644
+--- a/src/impl/vamp/collision/shapes.hh
++++ b/src/impl/vamp/collision/shapes.hh
+@@ -49,7 +49,7 @@ namespace vamp::collision
+         DataT axis_2_r;
+         DataT axis_3_r;
+ 
+-        inline constexpr auto compute_min_distance() -> DataT
++        inline VAMP_CONSTEXPR auto compute_min_distance() -> DataT
+         {
+             auto d_1 = dot_3(-x, -y, -z, axis_1_x, axis_1_y, axis_1_z);
+             auto d_2 = dot_3(-x, -y, -z, axis_2_x, axis_2_y, axis_2_z);
+@@ -63,7 +63,7 @@ namespace vamp::collision
+             auto y_n = y + axis_1_y * v_1 + axis_2_y * v_2 + axis_3_y * v_3;
+             auto z_n = z + axis_1_z * v_1 + axis_2_z * v_2 + axis_3_z * v_3;
+ 
+-            return sqrt(x_n * x_n + y_n * y_n + z_n * z_n);
++            return vamp::collision::sqrt(x_n * x_n + y_n * y_n + z_n * z_n);
+         }
+ 
+         Cuboid() = default;
+@@ -147,22 +147,22 @@ namespace vamp::collision
+         // for convenience to make some computations faster
+         DataT rdv;
+ 
+-        inline constexpr auto x2() -> DataT
++        inline VAMP_CONSTEXPR auto x2() -> DataT
+         {
+             return x1 + xv;
+         }
+ 
+-        inline constexpr auto y2() -> DataT
++        inline VAMP_CONSTEXPR auto y2() -> DataT
+         {
+             return y1 + yv;
+         }
+ 
+-        inline constexpr auto z2() -> DataT
++        inline VAMP_CONSTEXPR auto z2() -> DataT
+         {
+             return z1 + zv;
+         }
+ 
+-        inline constexpr auto compute_min_distance() -> DataT
++        inline VAMP_CONSTEXPR auto compute_min_distance() -> DataT
+         {
+             auto dot = clamp(dot_3(-x1, -y1, -z1, xv, yv, zv) * rdv, 0.F, 1.F);
+ 
+@@ -174,7 +174,7 @@ namespace vamp::collision
+             auto yo = -yp;
+             auto zo = -zp;
+ 
+-            auto ol = sqrt(dot_3(xo, yo, zo, xo, yo, zo));
++            auto ol = vamp::collision::sqrt(dot_3(xo, yo, zo, xo, yo, zo));
+             xo = xo / ol;
+             yo = yo / ol;
+             zo = zo / ol;
+@@ -185,7 +185,7 @@ namespace vamp::collision
+             auto yn = yp + ro * yo;
+             auto zn = zp + ro * zo;
+ 
+-            return sqrt(xn * xn + yn * yn + zn * zn);
++            return vamp::collision::sqrt(xn * xn + yn * yn + zn * zn);
+         }
+ 
+         Cylinder() = default;
+@@ -235,7 +235,7 @@ namespace vamp::collision
+ 
+         explicit Sphere(DataT x, DataT y, DataT z, DataT r) : Shape<DataT>(), x(x), y(y), z(z), r(r)
+         {
+-            Shape<DataT>::min_distance = sqrt(x * x + y * y + z * z) - r;
++            Shape<DataT>::min_distance = vamp::collision::sqrt(x * x + y * y + z * z) - r;
+         }
+ 
+         template <typename OtherDataT>
+diff --git a/src/impl/vamp/collision/sphere_capsule.hh b/src/impl/vamp/collision/sphere_capsule.hh
+index 7ee241c..626dfdd 100644
+--- a/src/impl/vamp/collision/sphere_capsule.hh
++++ b/src/impl/vamp/collision/sphere_capsule.hh
+@@ -6,7 +6,7 @@
+ namespace vamp::collision
+ {
+     template <typename DataT>
+-    inline constexpr auto sphere_capsule(
++    inline VAMP_CONSTEXPR auto sphere_capsule(
+         const Capsule<DataT> &c,
+         const DataT &x,
+         const DataT &y,
+@@ -22,13 +22,13 @@ namespace vamp::collision
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto sphere_capsule(const Capsule<DataT> &c, const Sphere<DataT> &s) noexcept -> DataT
++    inline VAMP_CONSTEXPR auto sphere_capsule(const Capsule<DataT> &c, const Sphere<DataT> &s) noexcept -> DataT
+     {
+         return sphere_capsule(c, s.x, s.y, s.z, s.r);
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto sphere_z_aligned_capsule(
++    inline VAMP_CONSTEXPR auto sphere_z_aligned_capsule(
+         const Capsule<DataT> &c,
+         const DataT &x,
+         const DataT &y,
+@@ -44,7 +44,7 @@ namespace vamp::collision
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto sphere_z_aligned_capsule(const Capsule<DataT> &c, const Sphere<DataT> &s) noexcept
++    inline VAMP_CONSTEXPR auto sphere_z_aligned_capsule(const Capsule<DataT> &c, const Sphere<DataT> &s) noexcept
+         -> DataT
+     {
+         return sphere_z_aligned_capsule(c, s.x, s.y, s.z, s.r);
+diff --git a/src/impl/vamp/collision/sphere_cuboid.hh b/src/impl/vamp/collision/sphere_cuboid.hh
+index 0ba6a04..b471d67 100644
+--- a/src/impl/vamp/collision/sphere_cuboid.hh
++++ b/src/impl/vamp/collision/sphere_cuboid.hh
+@@ -6,7 +6,7 @@
+ namespace vamp::collision
+ {
+     template <typename DataT>
+-    inline constexpr auto sphere_cuboid(
++    inline VAMP_CONSTEXPR auto sphere_cuboid(
+         const Cuboid<DataT> &c,
+         const DataT &x,
+         const DataT &y,
+@@ -26,13 +26,13 @@ namespace vamp::collision
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto sphere_cuboid(const Cuboid<DataT> &c, const Sphere<DataT> &s) noexcept -> DataT
++    inline VAMP_CONSTEXPR auto sphere_cuboid(const Cuboid<DataT> &c, const Sphere<DataT> &s) noexcept -> DataT
+     {
+         return sphere_cuboid(c, s.x, s.y, s.z, s.r * s.r);
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto sphere_z_aligned_cuboid(
++    inline VAMP_CONSTEXPR auto sphere_z_aligned_cuboid(
+         const Cuboid<DataT> &c,
+         const DataT &x,
+         const DataT &y,
+@@ -52,7 +52,7 @@ namespace vamp::collision
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto sphere_z_aligned_cuboid(const Cuboid<DataT> &c, const Sphere<DataT> &s) noexcept
++    inline VAMP_CONSTEXPR auto sphere_z_aligned_cuboid(const Cuboid<DataT> &c, const Sphere<DataT> &s) noexcept
+         -> DataT
+     {
+         return sphere_z_aligned_cuboid(c, s.x, s.y, s.z, s.r * s.r);
+diff --git a/src/impl/vamp/collision/sphere_heightfield.hh b/src/impl/vamp/collision/sphere_heightfield.hh
+index 1b3a547..eab30eb 100644
+--- a/src/impl/vamp/collision/sphere_heightfield.hh
++++ b/src/impl/vamp/collision/sphere_heightfield.hh
+@@ -6,7 +6,7 @@
+ namespace vamp::collision
+ {
+     template <typename DataT>
+-    inline constexpr auto sphere_heightfield(
++    inline VAMP_CONSTEXPR auto sphere_heightfield(
+         const HeightField<DataT> &a,
+         const DataT &x,
+         const DataT &y,
+diff --git a/src/impl/vamp/collision/sphere_sphere.hh b/src/impl/vamp/collision/sphere_sphere.hh
+index 27739a0..4055ff2 100644
+--- a/src/impl/vamp/collision/sphere_sphere.hh
++++ b/src/impl/vamp/collision/sphere_sphere.hh
+@@ -7,7 +7,7 @@ namespace vamp::collision
+ {
+ 
+     template <typename DataT>
+-    inline constexpr auto sphere_sphere_sql2(
++    inline VAMP_CONSTEXPR auto sphere_sphere_sql2(
+         const DataT &ax,
+         const DataT &ay,
+         const DataT &az,
+@@ -23,7 +23,7 @@ namespace vamp::collision
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto sphere_sphere_sql2(
++    inline VAMP_CONSTEXPR auto sphere_sphere_sql2(
+         const Sphere<DataT> &a,
+         const DataT &x,
+         const DataT &y,
+@@ -34,13 +34,13 @@ namespace vamp::collision
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto sphere_sphere_sql2(const Sphere<DataT> &a, const Sphere<DataT> &b) noexcept -> DataT
++    inline VAMP_CONSTEXPR auto sphere_sphere_sql2(const Sphere<DataT> &a, const Sphere<DataT> &b) noexcept -> DataT
+     {
+         return sphere_sphere_sql2(a, b.x, b.y, b.z, b.r);
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto sphere_sphere_l2(const Sphere<DataT> &a, const Sphere<DataT> &b) noexcept -> DataT
++    inline VAMP_CONSTEXPR auto sphere_sphere_l2(const Sphere<DataT> &a, const Sphere<DataT> &b) noexcept -> DataT
+     {
+         auto sum = sql2_3(a.x, a.y, a.z, b.x, b.y, b.z).sqrt();
+         return sum - (a.r + b.r);
+diff --git a/src/impl/vamp/collision/validity.hh b/src/impl/vamp/collision/validity.hh
+index b555c13..1ddcf97 100644
+--- a/src/impl/vamp/collision/validity.hh
++++ b/src/impl/vamp/collision/validity.hh
+@@ -20,7 +20,7 @@ namespace vamp
+         typename ArgT6,
+         typename ArgT7,
+         typename ArgT8>
+-    inline constexpr auto sphere_sphere_self_collision(
++    inline VAMP_CONSTEXPR auto sphere_sphere_self_collision(
+         ArgT1 ax_,
+         ArgT2 ay_,
+         ArgT3 az_,
+@@ -44,7 +44,7 @@ namespace vamp
+     }
+ 
+     template <typename DataT, typename ArgT1, typename ArgT2, typename ArgT3, typename ArgT4>
+-    inline constexpr auto sphere_environment_in_collision(
++    inline VAMP_CONSTEXPR auto sphere_environment_in_collision(
+         const collision::Environment<DataT> &e,  //
+         ArgT1 sx_,
+         ArgT2 sy_,
+@@ -249,7 +249,7 @@ namespace vamp
+     }
+ 
+     template <typename DataT>
+-    inline constexpr auto attachment_environment_collision(const collision::Environment<DataT> &e) noexcept
++    inline VAMP_CONSTEXPR auto attachment_environment_collision(const collision::Environment<DataT> &e) noexcept
+         -> bool
+     {
+         for (const auto &s : e.attachments->posed_spheres)
+@@ -268,7 +268,7 @@ namespace vamp
+     }
+ 
+     template <typename DataT, typename ArgT1, typename ArgT2, typename ArgT3, typename ArgT4>
+-    inline constexpr auto attachment_sphere_collision(
++    inline VAMP_CONSTEXPR auto attachment_sphere_collision(
+         const collision::Environment<DataT> &e,
+         ArgT1 sx_,
+         ArgT2 sy_,
+diff --git a/src/impl/vamp/compiler.hh b/src/impl/vamp/compiler.hh
+new file mode 100644
+index 0000000..233c1a3
+--- /dev/null
++++ b/src/impl/vamp/compiler.hh
+@@ -0,0 +1,8 @@
++#pragma once
++
++// MSVC cl.exe does not treat AVX intrinsics or std::sqrt as constexpr.
++#if defined(_MSC_VER) && !defined(__clang__)
++#define VAMP_CONSTEXPR
++#else
++#define VAMP_CONSTEXPR constexpr
++#endif
+diff --git a/src/impl/vamp/planning/aorrtc.hh b/src/impl/vamp/planning/aorrtc.hh
+index 692ac40..6b71347 100644
+--- a/src/impl/vamp/planning/aorrtc.hh
++++ b/src/impl/vamp/planning/aorrtc.hh
+@@ -27,7 +27,7 @@ namespace vamp::planning
+         using NNNode = GNATNode<dimension>;
+         using NN = NearestNeighborsGNAT<NNNode>;
+ 
+-        std::unique_ptr<float, decltype(&free)> buffer;
++        std::unique_ptr<float, decltype(&vamp::utils::vector_free)> buffer;
+         std::vector<std::size_t> parents;
+         std::vector<float> radii;
+         std::vector<float> costs;
+@@ -92,10 +92,10 @@ namespace vamp::planning
+ 
+         AOX_RRTC(std::size_t max_samples)
+           : buffer(
+-                std::unique_ptr<float, decltype(&free)>(
++                std::unique_ptr<float, decltype(&vamp::utils::vector_free)>(
+                     vamp::utils::vector_alloc<float, FloatVectorAlignment, FloatVectorWidth>(
+                         max_samples * Configuration::num_scalars_rounded),
+-                    &free))
++                    &vamp::utils::vector_free))
+         {
+             parents.resize(max_samples);
+             radii.resize(max_samples);
+diff --git a/src/impl/vamp/planning/fcit.hh b/src/impl/vamp/planning/fcit.hh
+index 23fd65d..7d6f2a4 100644
+--- a/src/impl/vamp/planning/fcit.hh
++++ b/src/impl/vamp/planning/fcit.hh
+@@ -93,10 +93,10 @@ namespace vamp::planning
+ 
+             std::size_t iter = 0;
+             typename Robot::template ConfigurationBlock<rake> temp_block;
+-            auto states = std::unique_ptr<float, decltype(&free)>(
++            auto states = std::unique_ptr<float, decltype(&vamp::utils::vector_free)>(
+                 vamp::utils::vector_alloc<float, FloatVectorAlignment, FloatVectorWidth>(
+                     settings.max_samples * Configuration::num_scalars_rounded),
+-                &free);
++                &vamp::utils::vector_free);
+ 
+             // TODO: Is it better to just use arrays for these since we're reserving full capacity
+             // anyway? Test it!
+diff --git a/src/impl/vamp/planning/prm.hh b/src/impl/vamp/planning/prm.hh
+index 94d68e8..060327c 100644
+--- a/src/impl/vamp/planning/prm.hh
++++ b/src/impl/vamp/planning/prm.hh
+@@ -72,9 +72,10 @@ namespace vamp::planning
+             std::size_t iter = 0;
+             std::vector<std::pair<NNNode<dimension>, float>> neighbors;
+             typename Robot::template ConfigurationBlock<rake> temp_block;
+-            auto states = std::unique_ptr<float>(
++            auto states = std::unique_ptr<float, decltype(&vamp::utils::vector_free)>(
+                 vamp::utils::vector_alloc<float, FloatVectorAlignment, FloatVectorWidth>(
+-                    settings.max_samples * Configuration::num_scalars_rounded));
++                    settings.max_samples * Configuration::num_scalars_rounded),
++                &vamp::utils::vector_free);
+             // TODO: Is it better to just use arrays for these since we're reserving full capacity
+             // anyway? Test it!
+             std::vector<RoadmapNode> nodes;
+@@ -212,10 +213,10 @@ namespace vamp::planning
+             std::size_t iter = 0;
+             std::vector<std::pair<NNNode<dimension>, float>> neighbors;
+             typename Robot::template ConfigurationBlock<rake> temp_block;
+-            auto states = std::unique_ptr<float, decltype(&free)>(
++            auto states = std::unique_ptr<float, decltype(&vamp::utils::vector_free)>(
+                 vamp::utils::vector_alloc<float, FloatVectorAlignment, FloatVectorWidth>(
+                     settings.max_samples * Configuration::num_scalars_rounded),
+-                &free);
++                &vamp::utils::vector_free);
+             // TODO: Is it better to just use arrays for these since we're reserving full capacity
+             // anyway? Test it!
+             std::vector<RoadmapNode> nodes;
+diff --git a/src/impl/vamp/planning/rrtc.hh b/src/impl/vamp/planning/rrtc.hh
+index 7c769d6..bbd0093 100644
+--- a/src/impl/vamp/planning/rrtc.hh
++++ b/src/impl/vamp/planning/rrtc.hh
+@@ -44,10 +44,10 @@ namespace vamp::planning
+ 
+             constexpr const std::size_t start_index = 0;
+ 
+-            auto buffer = std::unique_ptr<float, decltype(&free)>(
++            auto buffer = std::unique_ptr<float, decltype(&vamp::utils::vector_free)>(
+                 vamp::utils::vector_alloc<float, FloatVectorAlignment, FloatVectorWidth>(
+                     settings.max_samples * Configuration::num_scalars_rounded),
+-                &free);
++                &vamp::utils::vector_free);
+ 
+             const auto buffer_index = [&buffer](std::size_t index) -> float *
+             { return buffer.get() + index * Configuration::num_scalars_rounded; };
+diff --git a/src/impl/vamp/planning/validate.hh b/src/impl/vamp/planning/validate.hh
+index 0f011d6..69efac5 100644
+--- a/src/impl/vamp/planning/validate.hh
++++ b/src/impl/vamp/planning/validate.hh
+@@ -2,6 +2,7 @@
+ 
+ #include <cstdint>
+ 
++#include <vamp/compiler.hh>
+ #include <vamp/utils.hh>
+ #include <vamp/vector.hh>
+ #include <vamp/collision/environment.hh>
+@@ -21,7 +22,7 @@ namespace vamp::planning
+     };
+ 
+     template <typename Robot, std::size_t rake, std::size_t resolution>
+-    inline constexpr auto validate_vector(
++    inline VAMP_CONSTEXPR auto validate_vector(
+         const typename Robot::Configuration &start,
+         const typename Robot::Configuration &vector,
+         float distance,
+@@ -67,7 +68,7 @@ namespace vamp::planning
+     }
+ 
+     template <typename Robot, std::size_t rake, std::size_t resolution>
+-    inline constexpr auto validate_motion(
++    inline VAMP_CONSTEXPR auto validate_motion(
+         const typename Robot::Configuration &start,
+         const typename Robot::Configuration &goal,
+         const collision::Environment<FloatVector<rake>> &environment) -> bool
+diff --git a/src/impl/vamp/utils.hh b/src/impl/vamp/utils.hh
+index 9c4e84a..d131118 100644
+--- a/src/impl/vamp/utils.hh
++++ b/src/impl/vamp/utils.hh
+@@ -5,6 +5,10 @@
+ #include <utility>
+ #include <cstdint>
+ 
++#if defined(_MSC_VER)
++#include <malloc.h>
++#endif
++
+ namespace vamp::utils
+ {
+     inline constexpr auto round_size(std::size_t size, std::size_t block) noexcept -> std::size_t
+@@ -15,13 +19,26 @@ namespace vamp::utils
+     inline bool is_aligned(const void *ptr, uintptr_t alignment) noexcept
+     {
+         auto iptr = reinterpret_cast<uintptr_t>(ptr);
+-        return not(iptr % alignment);
++        return !(iptr % alignment);
+     }
+ 
+     template <typename T, std::size_t alignment, std::size_t vector_size>
+     inline auto vector_alloc(std::size_t n) noexcept -> T *
+     {
++#if defined(_MSC_VER)
++        return static_cast<T *>(_aligned_malloc(sizeof(T) * round_size(n, vector_size), alignment));
++#else
+         return static_cast<T *>(aligned_alloc(alignment, sizeof(T) * round_size(n, vector_size)));
++#endif
++    }
++
++    inline void vector_free(void *ptr) noexcept
++    {
++#if defined(_MSC_VER)
++        _aligned_free(ptr);
++#else
++        std::free(ptr);
++#endif
+     }
+ 
+     // Because ceil isn't constexpr until C++23 for some reason.....
+diff --git a/src/impl/vamp/vector.hh b/src/impl/vamp/vector.hh
+index a35d3d5..f30359d 100644
+--- a/src/impl/vamp/vector.hh
++++ b/src/impl/vamp/vector.hh
+@@ -3,7 +3,7 @@
+ #include <cstdint>
+ #include <vamp/vector/interface.hh>
+ 
+-#if defined(__x86_64__)
++#if defined(__x86_64__) || defined(_M_X64)
+ #include <vamp/vector/avx.hh>
+ #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+ #include <vamp/vector/neon.hh>
+@@ -11,7 +11,7 @@
+ 
+ namespace vamp
+ {
+-#if defined(__x86_64__)
++#if defined(__x86_64__) || defined(_M_X64)
+     using FloatT = float;
+     using SimdFloatT = __m256;
+     using SimdIntT = __m256i;
+diff --git a/src/impl/vamp/vector/avx.hh b/src/impl/vamp/vector/avx.hh
+index 2e30e5d..0e905d7 100644
+--- a/src/impl/vamp/vector/avx.hh
++++ b/src/impl/vamp/vector/avx.hh
+@@ -1,9 +1,15 @@
+ #pragma once
+ 
+-#if not defined(__x86_64__)
++#if !defined(__x86_64__) && !defined(_M_X64)
+ #error "Tried to compile x86 intrinsics on non-x86 platform!"
+ #endif
+ 
++#if defined(_MSC_VER) && !defined(__clang__)
++#define VAMP_SIMD_CONSTEXPR
++#else
++#define VAMP_SIMD_CONSTEXPR constexpr
++#endif
++
+ #include <vamp/vector/interface.hh>
+ 
+ #include <immintrin.h>
+@@ -45,25 +51,25 @@ namespace vamp
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto constant(ScalarT v) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto constant(ScalarT v) noexcept -> VectorT
+         {
+             return _mm256_set1_epi32(v);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto sub(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto sub(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_sub_epi32(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto add(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto add(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_add_epi32(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto mul(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto mul(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             // NOTE: Kinda slow. Note footgun with overflow to 64 bits, as well as footgun with
+             // "normal" intmul
+@@ -71,67 +77,67 @@ namespace vamp
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto bitneg(VectorT l) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto bitneg(VectorT l) noexcept -> VectorT
+         {
+             return _mm256_xor_si256(l, _mm256_cmpeq_epi32(l, l));
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto and_(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto and_(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_and_si256(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto or_(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto or_(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_or_si256(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto cmp_equal(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto cmp_equal(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_cmpeq_epi32(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto cmp_greater_than(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto cmp_greater_than(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_cmpgt_epi32(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto test_zero(VectorT l, VectorT r) noexcept -> unsigned int
++        inline static VAMP_SIMD_CONSTEXPR auto test_zero(VectorT l, VectorT r) noexcept -> unsigned int
+         {
+             return _mm256_testz_si256(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto load(const ScalarT *const i) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto load(const ScalarT *const i) noexcept -> VectorT
+         {
+             return _mm256_load_si256((const __m256i *const)i);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto load_unaligned(const ScalarT *const i) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto load_unaligned(const ScalarT *const i) noexcept -> VectorT
+         {
+             return _mm256_loadu_si256((const __m256i *const)i);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto store(ScalarT *f, VectorT v) noexcept -> void
++        inline static VAMP_SIMD_CONSTEXPR auto store(ScalarT *f, VectorT v) noexcept -> void
+         {
+             _mm256_store_si256(reinterpret_cast<VectorT *>(f), v);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto store_unaligned(ScalarT *f, VectorT v) noexcept -> void
++        inline static VAMP_SIMD_CONSTEXPR auto store_unaligned(ScalarT *f, VectorT v) noexcept -> void
+         {
+             _mm256_storeu_si256(reinterpret_cast<VectorT *>(f), v);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto mask(VectorT v) noexcept -> unsigned int
++        inline static VAMP_SIMD_CONSTEXPR auto mask(VectorT v) noexcept -> unsigned int
+         {
+             // HACK: This will create more FP port contention. We could use _mm256_movemask_epi8, but this has
+             // poor latency and would require a change to the logic for all_true
+@@ -139,24 +145,24 @@ namespace vamp
+         }
+ 
+         // TODO: Figure out how to support vector shifting; currently causes a template deduction error
+-        // inline static constexpr auto shift_left(VectorT v, VectorT i) noexcept -> VectorT
++        // inline static VAMP_SIMD_CONSTEXPR auto shift_left(VectorT v, VectorT i) noexcept -> VectorT
+         // {
+         //     return _mm256_sllv_epi32(v, i);
+         // }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto shift_left(VectorT v, unsigned int i) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto shift_left(VectorT v, unsigned int i) noexcept -> VectorT
+         {
+             return _mm256_slli_epi32(v, i);
+         }
+ 
+-        // inline static constexpr auto shift_right(VectorT v, VectorT i) noexcept -> VectorT
++        // inline static VAMP_SIMD_CONSTEXPR auto shift_right(VectorT v, VectorT i) noexcept -> VectorT
+         // {
+         //     return _mm256_srlv_epi32(v, i);
+         // }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto shift_right(VectorT v, unsigned int i) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto shift_right(VectorT v, unsigned int i) noexcept -> VectorT
+         {
+             return _mm256_srli_epi32(v, i);
+         }
+@@ -168,13 +174,13 @@ namespace vamp
+         }
+ 
+         template <typename = void>
+-        inline static constexpr auto gather(__m256i idxs, const ScalarT *base) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto gather(__m256i idxs, const ScalarT *base) noexcept -> VectorT
+         {
+             return _mm256_i32gather_epi32(base, idxs, sizeof(ScalarT));
+         }
+ 
+         template <typename = void>
+-        inline static constexpr auto
++        inline static VAMP_SIMD_CONSTEXPR auto
+         gather_select(__m256i idxs, VectorT mask, VectorT alternative, const ScalarT *base) noexcept
+             -> VectorT
+         {
+@@ -182,7 +188,7 @@ namespace vamp
+         }
+ 
+         template <typename OtherVectorT>
+-        inline static constexpr auto to(VectorT v) noexcept -> OtherVectorT
++        inline static VAMP_SIMD_CONSTEXPR auto to(VectorT v) noexcept -> OtherVectorT
+         {
+             if constexpr (std::is_same_v<OtherVectorT, __m256>)
+             {
+@@ -199,7 +205,7 @@ namespace vamp
+         }
+ 
+         template <typename OtherVectorT>
+-        inline static constexpr auto from(OtherVectorT v) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto from(OtherVectorT v) noexcept -> VectorT
+         {
+             {
+                 if constexpr (std::is_same_v<OtherVectorT, __m256>)
+@@ -214,7 +220,7 @@ namespace vamp
+         }
+ 
+         template <typename OtherVectorT>
+-        inline static constexpr auto as(VectorT v) noexcept -> OtherVectorT
++        inline static VAMP_SIMD_CONSTEXPR auto as(VectorT v) noexcept -> OtherVectorT
+         {
+             if constexpr (std::is_same_v<OtherVectorT, __m256>)
+             {
+@@ -236,37 +242,37 @@ namespace vamp
+         static constexpr std::size_t Alignment = 32;
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto constant(ScalarT v) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto constant(ScalarT v) noexcept -> VectorT
+         {
+             return _mm256_set1_ps(v);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto constant_int(unsigned int v) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto constant_int(unsigned int v) noexcept -> VectorT
+         {
+             return _mm256_castsi256_ps(_mm256_set1_epi32(v));
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto load(const ScalarT *const f) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto load(const ScalarT *const f) noexcept -> VectorT
+         {
+             return _mm256_load_ps(f);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto load_unaligned(const ScalarT *const f) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto load_unaligned(const ScalarT *const f) noexcept -> VectorT
+         {
+             return _mm256_loadu_ps(f);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto store(ScalarT *f, VectorT v) noexcept -> void
++        inline static VAMP_SIMD_CONSTEXPR auto store(ScalarT *f, VectorT v) noexcept -> void
+         {
+             _mm256_store_ps(f, v);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto store_unaligned(ScalarT *f, VectorT v) noexcept -> void
++        inline static VAMP_SIMD_CONSTEXPR auto store_unaligned(ScalarT *f, VectorT v) noexcept -> void
+         {
+             _mm256_storeu_ps(f, v);
+         }
+@@ -274,17 +280,23 @@ namespace vamp
+         template <unsigned int = 0>
+         inline static auto extract(VectorT v, int idx) noexcept -> ScalarT
+         {
++#if defined(_MSC_VER) && !defined(__clang__)
++            alignas(32) float buf[8];
++            _mm256_store_ps(buf, v);
++            return buf[idx];
++#else
+             return v[idx];
++#endif
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto broadcast(VectorT v, int idx) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto broadcast(VectorT v, int idx) noexcept -> VectorT
+         {
+             return _mm256_permutevar8x32_ps(v, _mm256_set1_epi32(idx));
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto bitneg(VectorT l) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto bitneg(VectorT l) noexcept -> VectorT
+         {
+             return _mm256_xor_ps(
+                 l, _mm256_castsi256_ps(_mm256_cmpeq_epi32(_mm256_castps_si256(l), _mm256_castps_si256(l))));
+@@ -292,61 +304,61 @@ namespace vamp
+ 
+         // NOTE: Dummy parameter because otherwise we get constexpr errors with set1_ps...
+         template <unsigned int = 0>
+-        inline static constexpr auto neg(VectorT l) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto neg(VectorT l) noexcept -> VectorT
+         {
+             return _mm256_xor_ps(l, _mm256_set1_ps(-0.0));
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto add(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto add(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_add_ps(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto sub(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto sub(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_sub_ps(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto mul(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto mul(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_mul_ps(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto cmp_less_equal(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto cmp_less_equal(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_cmp_ps(l, r, _CMP_LE_OQ);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto cmp_less_than(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto cmp_less_than(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_cmp_ps(l, r, _CMP_LT_OQ);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto cmp_greater_equal(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto cmp_greater_equal(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_cmp_ps(l, r, _CMP_GE_OQ);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto cmp_greater_than(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto cmp_greater_than(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_cmp_ps(l, r, _CMP_GT_OQ);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto cmp_equal(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto cmp_equal(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_cmp_ps(l, r, _CMP_EQ_OQ);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto cmp_not_equal(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto cmp_not_equal(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_cmp_ps(l, r, _CMP_NEQ_OQ);
+         }
+@@ -359,19 +371,19 @@ namespace vamp
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto div(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto div(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_div_ps(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto rcp(VectorT l) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto rcp(VectorT l) noexcept -> VectorT
+         {
+             return _mm256_rcp_ps(l);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto mask(VectorT v) noexcept -> unsigned int
++        inline static VAMP_SIMD_CONSTEXPR auto mask(VectorT v) noexcept -> unsigned int
+         {
+             return _mm256_movemask_ps(v);
+         }
+@@ -383,63 +395,63 @@ namespace vamp
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto test_zero(VectorT l, VectorT r) noexcept -> unsigned int
++        inline static VAMP_SIMD_CONSTEXPR auto test_zero(VectorT l, VectorT r) noexcept -> unsigned int
+         {
+             return _mm256_testz_ps(l, r);
+         }
+ 
+         // NOTE: Dummy parameter because otherwise we get constexpr errors with set1_ps...
+         template <unsigned int = 0>
+-        inline static constexpr auto abs(VectorT v) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto abs(VectorT v) noexcept -> VectorT
+         {
+             const auto abs_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
+             return _mm256_and_ps(v, abs_mask);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto and_(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto and_(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_and_ps(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto or_(VectorT l, VectorT r) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto or_(VectorT l, VectorT r) noexcept -> VectorT
+         {
+             return _mm256_or_ps(l, r);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto sqrt(VectorT v) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto sqrt(VectorT v) noexcept -> VectorT
+         {
+             return _mm256_mul_ps(v, _mm256_rsqrt_ps(v));
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto shift_left(VectorT v, unsigned int i) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto shift_left(VectorT v, unsigned int i) noexcept -> VectorT
+         {
+             return _mm256_castsi256_ps(_mm256_slli_epi32(_mm256_castps_si256(v), i));
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto shift_right(VectorT v, unsigned int i) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto shift_right(VectorT v, unsigned int i) noexcept -> VectorT
+         {
+             return _mm256_castsi256_ps(_mm256_srli_epi32(_mm256_castps_si256(v), i));
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto clamp(VectorT v, VectorT lower, VectorT upper) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto clamp(VectorT v, VectorT lower, VectorT upper) noexcept -> VectorT
+         {
+             return _mm256_min_ps(_mm256_max_ps(v, lower), upper);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto max(VectorT v, VectorT other) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto max(VectorT v, VectorT other) noexcept -> VectorT
+         {
+             return _mm256_max_ps(v, other);
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto hsum(VectorT v) noexcept -> ScalarT
++        inline static VAMP_SIMD_CONSTEXPR auto hsum(VectorT v) noexcept -> ScalarT
+         {
+             auto vhigh = _mm256_extractf128_ps(v, 1);
+             auto vlow = _mm256_castps256_ps128(v);
+@@ -453,7 +465,7 @@ namespace vamp
+ 
+         // converted from http://gruntthepeon.free.fr/ssemath/
+         template <unsigned int = 0>
+-        inline static constexpr auto sin(VectorT x) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto sin(VectorT x) noexcept -> VectorT
+         {
+             using IntVector = SIMDVector<__m256i>;
+ 
+@@ -549,7 +561,7 @@ namespace vamp
+ 
+         // NOTE: Dummy parameter because otherwise we get constexpr errors with set1_ps...
+         template <unsigned int = 0>
+-        inline static constexpr auto log(VectorT x) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto log(VectorT x) noexcept -> VectorT
+         {
+             using IntVector = SIMDVector<__m256i>;
+ 
+@@ -610,19 +622,19 @@ namespace vamp
+         }
+ 
+         template <unsigned int = 0>
+-        inline static constexpr auto blend(VectorT a, VectorT b, VectorT blend_mask) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto blend(VectorT a, VectorT b, VectorT blend_mask) noexcept -> VectorT
+         {
+             return _mm256_blendv_ps(a, b, blend_mask);
+         }
+ 
+         template <unsigned int blend_mask>
+-        inline static constexpr auto blend_constant(VectorT a, VectorT b) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto blend_constant(VectorT a, VectorT b) noexcept -> VectorT
+         {
+             return _mm256_blend_ps(a, b, blend_mask);
+         }
+ 
+         template <typename OtherVectorT>
+-        inline static constexpr auto to(VectorT v) noexcept -> OtherVectorT
++        inline static VAMP_SIMD_CONSTEXPR auto to(VectorT v) noexcept -> OtherVectorT
+         {
+             if constexpr (std::is_same_v<OtherVectorT, __m256i>)
+             {
+@@ -639,7 +651,7 @@ namespace vamp
+         }
+ 
+         template <typename OtherVectorT>
+-        inline static constexpr auto from(OtherVectorT v) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto from(OtherVectorT v) noexcept -> VectorT
+         {
+             if constexpr (std::is_same_v<OtherVectorT, __m256i>)
+             {
+@@ -652,7 +664,7 @@ namespace vamp
+         }
+ 
+         template <typename OtherVectorT>
+-        inline static constexpr auto as(VectorT v) noexcept -> OtherVectorT
++        inline static VAMP_SIMD_CONSTEXPR auto as(VectorT v) noexcept -> OtherVectorT
+         {
+             if constexpr (std::is_same_v<OtherVectorT, __m256i>)
+             {
+@@ -683,13 +695,13 @@ namespace vamp
+         }
+ 
+         template <typename = void>
+-        inline static constexpr auto gather(__m256i idxs, const ScalarT *base) noexcept -> VectorT
++        inline static VAMP_SIMD_CONSTEXPR auto gather(__m256i idxs, const ScalarT *base) noexcept -> VectorT
+         {
+             return _mm256_i32gather_ps(base, idxs, sizeof(ScalarT));
+         }
+ 
+         template <typename = void>
+-        inline static constexpr auto
++        inline static VAMP_SIMD_CONSTEXPR auto
+         gather_select(__m256i idxs, VectorT mask, VectorT alternative, const ScalarT *base) noexcept
+             -> VectorT
+         {
+diff --git a/src/impl/vamp/vector/eigen.hh b/src/impl/vamp/vector/eigen.hh
+index 0db3107..f3c165a 100644
+--- a/src/impl/vamp/vector/eigen.hh
++++ b/src/impl/vamp/vector/eigen.hh
+@@ -6,16 +6,16 @@
+ namespace vamp
+ {
+     template <std::size_t alignment>
+-    inline constexpr auto get_eigen_alignment() -> Eigen::AlignmentType;
++    inline VAMP_CONSTEXPR auto get_eigen_alignment() -> Eigen::AlignmentType;
+ 
+     template <>
+-    inline constexpr auto get_eigen_alignment<16>() -> Eigen::AlignmentType
++    inline VAMP_CONSTEXPR auto get_eigen_alignment<16>() -> Eigen::AlignmentType
+     {
+         return Eigen::Aligned16;
+     }
+ 
+     template <>
+-    inline constexpr auto get_eigen_alignment<32>() -> Eigen::AlignmentType
++    inline VAMP_CONSTEXPR auto get_eigen_alignment<32>() -> Eigen::AlignmentType
+     {
+         return Eigen::Aligned32;
+     }
+@@ -29,7 +29,7 @@ namespace vamp
+         Eigen::Map<const Eigen::Matrix<float, dim, 1>, get_eigen_alignment<FloatVectorAlignment>()>;
+ 
+     template <std::size_t dim>
+-    inline constexpr auto eigen_to_vector(const Eigen::Vector<float, dim> &vector) noexcept
++    inline VAMP_CONSTEXPR auto eigen_to_vector(const Eigen::Vector<float, dim> &vector) noexcept
+         -> vamp::FloatVector<dim>
+     {
+         alignas(FloatVectorAlignment) std::array<float, dim> array;
+@@ -38,7 +38,7 @@ namespace vamp
+     }
+ 
+     template <std::size_t dim>
+-    inline constexpr auto vector_to_eigen(const vamp::FloatVector<dim> &vector) noexcept
++    inline VAMP_CONSTEXPR auto vector_to_eigen(const vamp::FloatVector<dim> &vector) noexcept
+         -> Eigen::Matrix<float, dim, 1>
+     {
+         alignas(FloatVectorAlignment) std::array<float, vamp::FloatVector<dim>::num_scalars_rounded> array =
+diff --git a/src/impl/vamp/vector/interface.hh b/src/impl/vamp/vector/interface.hh
+index 48416bc..864c8c4 100644
+--- a/src/impl/vamp/vector/interface.hh
++++ b/src/impl/vamp/vector/interface.hh
+@@ -1,4 +1,5 @@
+ #pragma once
++#include <vamp/compiler.hh>
+ #include <algorithm>
+ #include <array>
+ #include <cassert>
+@@ -17,7 +18,7 @@
+ namespace vamp
+ {
+     template <typename S>
+-    inline constexpr void print_vector(std::ostream &out, typename S::VectorT vec) noexcept
++    inline VAMP_CONSTEXPR void print_vector(std::ostream &out, typename S::VectorT vec) noexcept
+     {
+         for (auto i = 0ul; i < S::VectorWidth - 1; ++i)
+         {
+@@ -60,7 +61,7 @@ namespace vamp
+         inline static constexpr std::size_t num_rows = Sig::num_rows;
+         using DataT = typename Sig::DataT;
+ 
+-        inline constexpr auto to_array() const noexcept
++        inline VAMP_CONSTEXPR auto to_array() const noexcept
+             -> std::array<typename S::ScalarT, num_scalars_rounded>
+         {
+             alignas(S::Alignment) std::array<typename S::ScalarT, num_scalars_rounded> result = {};
+@@ -68,18 +69,18 @@ namespace vamp
+             return result;
+         }
+ 
+-        inline constexpr void
++        inline VAMP_CONSTEXPR void
+         to_array(std::array<typename S::ScalarT, num_scalars_rounded> &buf) const noexcept
+         {
+             to_array(buf.data());
+         }
+ 
+-        inline constexpr void to_array(typename S::ScalarT *buf) const noexcept
++        inline VAMP_CONSTEXPR void to_array(typename S::ScalarT *buf) const noexcept
+         {
+             store_vector(buf, std::make_index_sequence<num_vectors>());
+         }
+ 
+-        inline constexpr void to_array_unaligned(typename S::ScalarT *buf) const noexcept
++        inline VAMP_CONSTEXPR void to_array_unaligned(typename S::ScalarT *buf) const noexcept
+         {
+             store_vector_unaligned(buf, std::make_index_sequence<num_vectors>());
+         }
+@@ -89,97 +90,97 @@ namespace vamp
+             return D(make_array(f, std::make_index_sequence<num_vectors>()));
+         }
+ 
+-        inline constexpr auto rcp() const noexcept -> D
++        inline VAMP_CONSTEXPR auto rcp() const noexcept -> D
+         {
+             return D(apply<S::template rcp<0>>(d()->data));
+         }
+ 
+         template <typename T, typename allow_types<D>::template check<T> = true>
+-        inline constexpr auto add(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto add(T o) const noexcept -> D
+         {
+             return add(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto add(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto add(T o) const noexcept -> D
+         {
+             return D(apply<S::template add<0>>(d()->data, o));
+         }
+ 
+         template <typename T, typename allow_types<D>::template check<T> = true>
+-        inline constexpr auto sub(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto sub(T o) const noexcept -> D
+         {
+             return sub(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto sub(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto sub(T o) const noexcept -> D
+         {
+             return D(apply<S::template sub<0>>(d()->data, o));
+         }
+ 
+         template <typename T, typename allow_types<D>::template check<T> = true>
+-        inline constexpr auto mul(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto mul(T o) const noexcept -> D
+         {
+             return mul(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto mul(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto mul(T o) const noexcept -> D
+         {
+             return D(apply<S::template mul<0>>(d()->data, o));
+         }
+ 
+         template <typename T, typename allow_types<D>::template check<T> = true>
+-        inline constexpr auto div(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto div(T o) const noexcept -> D
+         {
+             return div(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto div(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto div(T o) const noexcept -> D
+         {
+             return D(apply<S::template div<0>>(d()->data, o));
+         }
+ 
+         template <typename T, typename allow_types<D>::template check<T> = true>
+-        inline constexpr auto equal(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto equal(T o) const noexcept -> D
+         {
+             return equal(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto equal(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto equal(T o) const noexcept -> D
+         {
+             return D(apply<S::template cmp_equal<0>>(d()->data, o));
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto not_equal(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto not_equal(T o) const noexcept -> D
+         {
+             return D(apply<S::template cmp_not_equal<0>>(d()->data, o));
+         }
+ 
+         template <typename T, typename allow_types<D>::template check<T> = true>
+-        inline constexpr auto not_equal(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto not_equal(T o) const noexcept -> D
+         {
+             return not_equal(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto less_equal(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto less_equal(T o) const noexcept -> D
+         {
+             return D(apply<S::template cmp_less_equal<0>>(d()->data, o));
+         }
+ 
+         template <typename T, typename allow_types<D>::template check<T> = true>
+-        inline constexpr auto greater_equal(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto greater_equal(T o) const noexcept -> D
+         {
+             return greater_equal(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto greater_equal(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto greater_equal(T o) const noexcept -> D
+         {
+             if constexpr (std::is_same_v<T, DataT>)
+             {
+@@ -192,13 +193,13 @@ namespace vamp
+         }
+ 
+         template <typename T, typename allow_types<D>::template check<T> = true>
+-        inline constexpr auto greater_than(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto greater_than(T o) const noexcept -> D
+         {
+             return greater_than(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto greater_than(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto greater_than(T o) const noexcept -> D
+         {
+             if constexpr (std::is_same_v<T, DataT>)
+             {
+@@ -211,13 +212,13 @@ namespace vamp
+         }
+ 
+         template <typename T, typename allow_types<D>::template check<T> = true>
+-        inline constexpr auto less_than(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto less_than(T o) const noexcept -> D
+         {
+             return less_than(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto less_than(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto less_than(T o) const noexcept -> D
+         {
+             if constexpr (std::is_same_v<T, DataT>)
+             {
+@@ -229,101 +230,101 @@ namespace vamp
+             }
+         }
+ 
+-        inline constexpr auto equal(typename S::ScalarT s) const noexcept -> D
++        inline VAMP_CONSTEXPR auto equal(typename S::ScalarT s) const noexcept -> D
+         {
+             return equal(broadcast_scalar(s));
+         }
+ 
+-        inline constexpr auto less_equal(typename S::ScalarT s) const noexcept -> D
++        inline VAMP_CONSTEXPR auto less_equal(typename S::ScalarT s) const noexcept -> D
+         {
+             return less_equal(broadcast_scalar(s));
+         }
+ 
+-        inline constexpr auto greater_equal(typename S::ScalarT s) const noexcept -> D
++        inline VAMP_CONSTEXPR auto greater_equal(typename S::ScalarT s) const noexcept -> D
+         {
+             return greater_equal(broadcast_scalar(s));
+         }
+ 
+-        inline constexpr auto greater_than(typename S::ScalarT s) const noexcept -> D
++        inline VAMP_CONSTEXPR auto greater_than(typename S::ScalarT s) const noexcept -> D
+         {
+             return greater_than(broadcast_scalar(s));
+         }
+ 
+-        inline constexpr auto less_than(typename S::ScalarT s) const noexcept -> D
++        inline VAMP_CONSTEXPR auto less_than(typename S::ScalarT s) const noexcept -> D
+         {
+             return greater_than(broadcast_scalar(s));
+         }
+ 
+         template <typename T, typename allow_types<D>::template check<T> = true>
+-        inline constexpr auto test_zero(T o) const noexcept -> bool
++        inline VAMP_CONSTEXPR auto test_zero(T o) const noexcept -> bool
+         {
+             return test_zero(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto test_zero(T o) const noexcept -> bool
++        inline VAMP_CONSTEXPR auto test_zero(T o) const noexcept -> bool
+         {
+             return unpack::and_(apply<S::template test_zero<0>>(d()->data, o));
+         }
+ 
+-        [[nodiscard]] inline constexpr auto test_zero() const noexcept -> bool
++        [[nodiscard]] inline VAMP_CONSTEXPR auto test_zero() const noexcept -> bool
+         {
+             return test_zero(d()->data);
+         }
+ 
+-        inline constexpr auto test_zero(typename S::ScalarT s) -> bool
++        inline VAMP_CONSTEXPR auto test_zero(typename S::ScalarT s) -> bool
+         {
+             return test_zero(broadcast_scalar(s));
+         }
+ 
+-        inline constexpr auto test_any_equal(D o) const noexcept -> bool
++        inline VAMP_CONSTEXPR auto test_any_equal(D o) const noexcept -> bool
+         {
+             return (o == *d()).any();
+         }
+ 
+-        inline constexpr auto test_any_less_equal(D o) const noexcept -> bool
++        inline VAMP_CONSTEXPR auto test_any_less_equal(D o) const noexcept -> bool
+         {
+             return (*d() <= o).any();
+         }
+ 
+-        inline constexpr auto test_any_greater_equal(D o) const noexcept -> bool
++        inline VAMP_CONSTEXPR auto test_any_greater_equal(D o) const noexcept -> bool
+         {
+             return (*d() >= o).any();
+         }
+ 
+-        inline constexpr auto test_all_equal(D o) const noexcept -> bool
++        inline VAMP_CONSTEXPR auto test_all_equal(D o) const noexcept -> bool
+         {
+             return (*d() == o).all();
+         }
+ 
+-        inline constexpr auto test_all_less_equal(D o) const noexcept -> bool
++        inline VAMP_CONSTEXPR auto test_all_less_equal(D o) const noexcept -> bool
+         {
+             return (*d() <= o).all();
+         }
+ 
+-        inline constexpr auto test_all_greater_equal(D o) const noexcept -> bool
++        inline VAMP_CONSTEXPR auto test_all_greater_equal(D o) const noexcept -> bool
+         {
+             return (*d() >= o).all();
+         }
+ 
+-        inline constexpr auto and_(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto and_(D o) const noexcept -> D
+         {
+             return and_(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto and_(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto and_(T o) const noexcept -> D
+         {
+             return D(apply<S::template and_<0>>(d()->data, o));
+         }
+ 
+-        inline constexpr auto or_(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto or_(D o) const noexcept -> D
+         {
+             return or_(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto or_(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto or_(T o) const noexcept -> D
+         {
+             return D(apply<S::template or_<0>>(d()->data, o));
+         }
+@@ -331,7 +332,7 @@ namespace vamp
+         template <
+             typename T,
+             typename allow_types<DataT, typename S::VectorT, unsigned int>::template check<T> = true>
+-        inline constexpr auto shift_left(T c) const noexcept -> D
++        inline VAMP_CONSTEXPR auto shift_left(T c) const noexcept -> D
+         {
+             return D(apply<S::template shift_left<0>>(d()->data, c));
+         }
+@@ -339,97 +340,97 @@ namespace vamp
+         template <
+             typename T,
+             typename allow_types<DataT, typename S::VectorT, unsigned int>::template check<T> = true>
+-        inline constexpr auto shift_right(T c) const noexcept -> D
++        inline VAMP_CONSTEXPR auto shift_right(T c) const noexcept -> D
+         {
+             return D(apply<S::template shift_right<0>>(d()->data, c));
+         }
+ 
+-        inline constexpr auto abs() const noexcept -> D
++        inline VAMP_CONSTEXPR auto abs() const noexcept -> D
+         {
+             return D(apply<S::template abs<0>>(d()->data));
+         }
+ 
+-        inline constexpr auto sqrt() const noexcept -> D
++        inline VAMP_CONSTEXPR auto sqrt() const noexcept -> D
+         {
+             return D(apply<S::template sqrt<0>>(d()->data));
+         }
+ 
+-        inline constexpr auto floor() const noexcept -> D
++        inline VAMP_CONSTEXPR auto floor() const noexcept -> D
+         {
+             return D(apply<S::template floor<0>>(d()->data));
+         }
+ 
+-        inline constexpr auto clamp(typename S::VectorT lower, typename S::VectorT upper) const noexcept -> D
++        inline VAMP_CONSTEXPR auto clamp(typename S::VectorT lower, typename S::VectorT upper) const noexcept -> D
+         {
+             return D(apply<S::template clamp<0>>(d()->data, lower, upper));
+         }
+ 
+         // HACK: Because making shape-matched clamping work in general is a pain
+         template <std::size_t n_v = num_vectors, typename = std::enable_if_t<n_v == 1, bool>>
+-        inline constexpr auto clamp(const D &lower, const D &upper) const noexcept -> D
++        inline VAMP_CONSTEXPR auto clamp(const D &lower, const D &upper) const noexcept -> D
+         {
+             return clamp(lower.data[0], upper.data[0]);
+         }
+ 
+-        inline constexpr auto clamp(typename S::ScalarT lower, typename S::ScalarT upper) const noexcept -> D
++        inline VAMP_CONSTEXPR auto clamp(typename S::ScalarT lower, typename S::ScalarT upper) const noexcept -> D
+         {
+             return D(
+                 apply<S::template clamp<0>>(d()->data, broadcast_scalar(lower), broadcast_scalar(upper)));
+         }
+ 
+         template <typename T, typename allow_types<D>::template check<T> = true>
+-        inline constexpr auto max(T o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto max(T o) const noexcept -> D
+         {
+             return max(o.data);
+         }
+ 
+         template <typename T, typename allow_types<DataT, typename S::VectorT>::template check<T> = true>
+-        inline constexpr auto max(T other) const noexcept -> D
++        inline VAMP_CONSTEXPR auto max(T other) const noexcept -> D
+         {
+             return D(apply<S::template max<0>>(d()->data, other));
+         }
+ 
+-        inline constexpr auto max(typename S::ScalarT other) const noexcept -> D
++        inline VAMP_CONSTEXPR auto max(typename S::ScalarT other) const noexcept -> D
+         {
+             return D(apply<S::template max<0>>(d()->data, broadcast_scalar(other)));
+         }
+ 
+-        inline constexpr auto hsum() const noexcept -> typename S::ScalarT
++        inline VAMP_CONSTEXPR auto hsum() const noexcept -> typename S::ScalarT
+         {
+             return S::hsum(unpack::sum_(d()->data));
+         }
+ 
+-        inline constexpr auto l2_norm() const noexcept -> typename S::ScalarT
++        inline VAMP_CONSTEXPR auto l2_norm() const noexcept -> typename S::ScalarT
+         {
+             return std::sqrt(squared_l2_norm());
+         }
+ 
+-        inline constexpr auto squared_l2_norm() const noexcept -> typename S::ScalarT
++        inline VAMP_CONSTEXPR auto squared_l2_norm() const noexcept -> typename S::ScalarT
+         {
+             return (D(apply<S::template mul<0>>(d()->data, d()->data))).hsum();
+         }
+ 
+-        inline constexpr auto blend(D other, D blend_mask) const noexcept -> D
++        inline VAMP_CONSTEXPR auto blend(D other, D blend_mask) const noexcept -> D
+         {
+             return D(apply<S::template blend<0>>(d()->data, other.data, blend_mask.data));
+         }
+ 
+-        inline constexpr auto distance(D other) const noexcept -> typename S::ScalarT
++        inline VAMP_CONSTEXPR auto distance(D other) const noexcept -> typename S::ScalarT
+         {
+             return (other - *d()).l2_norm();
+         }
+ 
+-        inline constexpr auto interpolate(D other, typename S::ScalarT alpha) const noexcept -> D
++        inline VAMP_CONSTEXPR auto interpolate(D other, typename S::ScalarT alpha) const noexcept -> D
+         {
+             return *d() + (other - *d()) * alpha;
+         }
+ 
+-        inline constexpr auto log() const noexcept -> D
++        inline VAMP_CONSTEXPR auto log() const noexcept -> D
+         {
+             return D(apply<S::template log<0>>(d()->data));
+         }
+ 
+-        inline constexpr auto remove_corrupted() const noexcept -> D
++        inline VAMP_CONSTEXPR auto remove_corrupted() const noexcept -> D
+         {
+             auto mask = sub(*d());
+             return blend(zero_vector(), mask);
+@@ -439,7 +440,7 @@ namespace vamp
+             typename ScalarT = typename S::ScalarT,
+             typename =
+                 std::enable_if_t<std::is_same_v<ScalarT, float> or std::is_same_v<ScalarT, double>, bool>>
+-        inline constexpr auto sin() const noexcept -> D
++        inline VAMP_CONSTEXPR auto sin() const noexcept -> D
+         {
+             return D(apply<S::template sin<0>>(d()->data));
+         }
+@@ -448,7 +449,7 @@ namespace vamp
+             typename ScalarT = typename S::ScalarT,
+             typename =
+                 std::enable_if_t<std::is_same_v<ScalarT, float> or std::is_same_v<ScalarT, double>, bool>>
+-        inline constexpr auto cos() const noexcept -> D
++        inline VAMP_CONSTEXPR auto cos() const noexcept -> D
+         {
+             constexpr float PI = 3.14159265359;
+             const auto v_sq = *d() + static_cast<typename S::ScalarT>(PI / 2.);
+@@ -473,7 +474,7 @@ namespace vamp
+         template <
+             typename T,
+             typename allow_types<DataT, typename S::VectorT, unsigned int>::template check<T> = true>
+-        inline constexpr auto operator<<(T c) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator<<(T c) const noexcept -> D
+         {
+             return shift_left(c);
+         }
+@@ -481,147 +482,147 @@ namespace vamp
+         template <
+             typename T,
+             typename allow_types<DataT, typename S::VectorT, unsigned int>::template check<T> = true>
+-        inline constexpr auto operator>>(T c) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator>>(T c) const noexcept -> D
+         {
+             return shift_right(c);
+         }
+ 
+-        inline constexpr auto operator~() const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator~() const noexcept -> D
+         {
+             return D(apply<S::template bitneg<0>>(d()->data));
+         }
+ 
+-        inline constexpr auto operator-() const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator-() const noexcept -> D
+         {
+             return D(apply<S::template neg<0>>(d()->data));
+         }
+ 
+-        inline constexpr auto operator+(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator+(D o) const noexcept -> D
+         {
+             return add(o.data);
+         }
+ 
+-        inline constexpr auto operator-(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator-(D o) const noexcept -> D
+         {
+             return sub(o.data);
+         }
+ 
+-        inline constexpr auto operator*(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator*(D o) const noexcept -> D
+         {
+             return mul(o.data);
+         }
+ 
+-        inline constexpr auto operator/(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator/(D o) const noexcept -> D
+         {
+             return div(o.data);
+         }
+ 
+-        inline constexpr auto operator|(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator|(D o) const noexcept -> D
+         {
+             return or_(o.data);
+         }
+ 
+-        inline constexpr auto operator&(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator&(D o) const noexcept -> D
+         {
+             return and_(o.data);
+         }
+ 
+-        inline constexpr auto operator==(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator==(D o) const noexcept -> D
+         {
+             return equal(o.data);
+         }
+ 
+-        inline constexpr auto operator!=(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator!=(D o) const noexcept -> D
+         {
+             return not_equal(o.data);
+         }
+ 
+-        inline constexpr auto operator<=(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator<=(D o) const noexcept -> D
+         {
+             return less_equal(o.data);
+         }
+ 
+-        inline constexpr auto operator>=(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator>=(D o) const noexcept -> D
+         {
+             return greater_equal(o.data);
+         }
+ 
+-        inline constexpr auto operator<(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator<(D o) const noexcept -> D
+         {
+             return less_than(o.data);
+         }
+ 
+-        inline constexpr auto operator>(D o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator>(D o) const noexcept -> D
+         {
+             return greater_than(o.data);
+         }
+ 
+-        inline constexpr auto operator+(typename S::ScalarT f) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator+(typename S::ScalarT f) const noexcept -> D
+         {
+             return add(broadcast_scalar(f));
+         }
+ 
+-        inline constexpr auto operator-(typename S::ScalarT f) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator-(typename S::ScalarT f) const noexcept -> D
+         {
+             return sub(broadcast_scalar(f));
+         }
+ 
+-        inline constexpr auto operator*(typename S::ScalarT f) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator*(typename S::ScalarT f) const noexcept -> D
+         {
+             return mul(broadcast_scalar(f));
+         }
+ 
+-        inline constexpr auto operator/(typename S::ScalarT f) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator/(typename S::ScalarT f) const noexcept -> D
+         {
+             return div(broadcast_scalar(f));
+         }
+ 
+-        inline constexpr auto operator|(typename S::ScalarT o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator|(typename S::ScalarT o) const noexcept -> D
+         {
+             return or_(broadcast_scalar(o));
+         }
+ 
+-        inline constexpr auto operator&(typename S::ScalarT o) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator&(typename S::ScalarT o) const noexcept -> D
+         {
+             return and_(broadcast_scalar(o));
+         }
+ 
+-        inline constexpr auto operator==(typename S::ScalarT f) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator==(typename S::ScalarT f) const noexcept -> D
+         {
+             return equal(broadcast_scalar(f));
+         }
+ 
+-        inline constexpr auto operator!=(typename S::ScalarT f) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator!=(typename S::ScalarT f) const noexcept -> D
+         {
+             return not_equal(broadcast_scalar(f));
+         }
+ 
+-        inline constexpr auto operator<=(typename S::ScalarT f) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator<=(typename S::ScalarT f) const noexcept -> D
+         {
+             return less_equal(broadcast_scalar(f));
+         }
+ 
+-        inline constexpr auto operator>=(typename S::ScalarT f) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator>=(typename S::ScalarT f) const noexcept -> D
+         {
+             return greater_equal(broadcast_scalar(f));
+         }
+ 
+-        inline constexpr auto operator>(typename S::ScalarT f) const noexcept -> D
++        inline VAMP_CONSTEXPR auto operator>(typename S::ScalarT f) const noexcept -> D
+         {
+             return greater_than(broadcast_scalar(f));
+         }
+ 
+-        [[nodiscard]] inline constexpr auto any() const noexcept -> bool
++        [[nodiscard]] inline VAMP_CONSTEXPR auto any() const noexcept -> bool
+         {
+             return unpack::or_(apply<S::template mask<0>>(d()->data));
+         }
+ 
+-        [[nodiscard]] inline constexpr auto none() const noexcept -> bool
++        [[nodiscard]] inline VAMP_CONSTEXPR auto none() const noexcept -> bool
+         {
+             return !unpack::or_(apply<S::template mask<0>>(d()->data));
+         }
+ 
+-        [[nodiscard]] inline constexpr auto all() const noexcept -> bool
++        [[nodiscard]] inline VAMP_CONSTEXPR auto all() const noexcept -> bool
+         {
+             return unpack::and_(apply<all_true>(apply<S::template mask<0>>(d()->data)));
+         }
+@@ -632,13 +633,13 @@ namespace vamp
+         }
+ 
+         template <typename OtherT, typename std::enable_if_t<not std::is_same_v<OtherT, D>, bool> = true>
+-        inline constexpr auto to() const noexcept -> OtherT
++        inline VAMP_CONSTEXPR auto to() const noexcept -> OtherT
+         {
+             return OtherT{apply<S::template to<typename OtherT::S::VectorT>>(d()->data)};
+         }
+ 
+         template <typename OtherT, typename std::enable_if_t<std::is_same_v<OtherT, D>, bool> = true>
+-        inline constexpr auto to() const noexcept -> OtherT
++        inline VAMP_CONSTEXPR auto to() const noexcept -> OtherT
+         {
+             return *d();
+         }
+@@ -650,12 +651,12 @@ namespace vamp
+         }
+ 
+         template <typename OtherT, typename std::enable_if_t<not std::is_same_v<OtherT, D>, bool> = true>
+-        inline constexpr auto as() const noexcept -> OtherT
++        inline VAMP_CONSTEXPR auto as() const noexcept -> OtherT
+         {
+             return OtherT{apply<S::template as<typename OtherT::S::VectorT>>(d()->data)};
+         }
+ 
+-        inline constexpr auto trim() const noexcept -> D
++        inline VAMP_CONSTEXPR auto trim() const noexcept -> D
+         {
+             if constexpr (num_scalars % S::VectorWidth)
+             {
+@@ -702,7 +703,7 @@ namespace vamp
+             return (... | (1 << (S::VectorWidth - 1 - I)));
+         }
+ 
+-        inline constexpr void
++        inline VAMP_CONSTEXPR void
+         broadcast_array(std::array<typename S::ScalarT, num_vectors> scalar_data) noexcept
+         {
+             d()->data = apply<S::template constant<0>>(scalar_data);
+@@ -715,13 +716,13 @@ namespace vamp
+                 *reinterpret_cast<std::array<typename S::ScalarT, num_vectors> *>(scalar_data.data()));
+         }
+ 
+-        inline constexpr auto broadcast_scalar(typename S::ScalarT s) const noexcept -> typename S::VectorT
++        inline VAMP_CONSTEXPR auto broadcast_scalar(typename S::ScalarT s) const noexcept -> typename S::VectorT
+         {
+             return S::template constant<0>(s);
+         }
+ 
+         template <bool is_aligned = true>
+-        inline constexpr void pack(const typename S::ScalarT *const scalar_data) noexcept
++        inline VAMP_CONSTEXPR void pack(const typename S::ScalarT *const scalar_data) noexcept
+         {
+             load_vector<is_aligned>(scalar_data, std::make_index_sequence<num_vectors>());
+         }
+@@ -741,7 +742,7 @@ namespace vamp
+         }
+ 
+         template <bool is_aligned, std::size_t... I>
+-        inline constexpr void
++        inline VAMP_CONSTEXPR void
+         load_vector(const typename S::ScalarT *const scalar_array, std::index_sequence<I...>) noexcept
+         {
+             // TODO: This might segfault if we had to over-allocate vectors and the scalar data isn't
+@@ -758,7 +759,7 @@ namespace vamp
+         }
+ 
+         template <std::size_t... I>
+-        inline constexpr void
++        inline VAMP_CONSTEXPR void
+         store_vector(typename S::ScalarT *scalar_array, std::index_sequence<I...>) const noexcept
+         {
+             // TODO: This might segfault if we had to over-allocate vectors and the scalar data isn't
+@@ -767,7 +768,7 @@ namespace vamp
+         }
+ 
+         template <std::size_t... I>
+-        inline constexpr void
++        inline VAMP_CONSTEXPR void
+         store_vector_unaligned(typename S::ScalarT *scalar_array, std::index_sequence<I...>) const noexcept
+         {
+             // TODO: This might segfault if we had to over-allocate vectors and the scalar data isn't
+@@ -776,12 +777,12 @@ namespace vamp
+              (S::template store_unaligned<0>(scalar_array + I * S::VectorWidth, std::get<I>(d()->data))));
+         }
+ 
+-        inline constexpr auto d() const noexcept -> const D *
++        inline VAMP_CONSTEXPR auto d() const noexcept -> const D *
+         {
+             return static_cast<const D *>(this);
+         }
+ 
+-        inline constexpr auto d() noexcept -> D *
++        inline VAMP_CONSTEXPR auto d() noexcept -> D *
+         {
+             return static_cast<D *>(this);
+         }
+@@ -930,43 +931,43 @@ namespace vamp
+         {
+         }
+ 
+-        [[nodiscard]] inline constexpr auto row(std::size_t idx) const noexcept -> RowT
++        [[nodiscard]] inline VAMP_CONSTEXPR auto row(std::size_t idx) const noexcept -> RowT
+         {
+             return RowT(*reinterpret_cast<const std::array<typename S::VectorT, num_vectors_per_row> *>(
+                 data.data() + idx));
+         }
+ 
+-        [[nodiscard]] inline constexpr auto row(std::size_t idx) noexcept -> RowT &
++        [[nodiscard]] inline VAMP_CONSTEXPR auto row(std::size_t idx) noexcept -> RowT &
+         {
+             return *reinterpret_cast<RowT *>(
+                 reinterpret_cast<std::array<typename S::VectorT, num_vectors_per_row> *>(data.data() + idx));
+         }
+ 
+-        [[nodiscard]] inline constexpr auto element(std::size_t idx) const noexcept -> typename S::ScalarT
++        [[nodiscard]] inline VAMP_CONSTEXPR auto element(std::size_t idx) const noexcept -> typename S::ScalarT
+         {
+             std::size_t row_idx = idx / num_scalars_per_row;
+             std::size_t col_idx = idx % num_scalars_per_row;
+             return S::extract(data[row_idx], col_idx);
+         }
+ 
+-        inline constexpr auto operator[](std::size_t idx) const noexcept -> RowT
++        inline VAMP_CONSTEXPR auto operator[](std::size_t idx) const noexcept -> RowT
+         {
+             return row(idx);
+         }
+ 
+-        inline constexpr auto operator[](std::pair<std::size_t, std::size_t> idx) const noexcept ->
++        inline VAMP_CONSTEXPR auto operator[](std::pair<std::size_t, std::size_t> idx) const noexcept ->
+             typename S::ScalarT
+         {
+             auto [row_idx, col_idx] = idx;
+             return S::extract(data[row_idx], col_idx);
+         }
+ 
+-        inline constexpr auto operator[](std::size_t idx) noexcept -> RowT &
++        inline VAMP_CONSTEXPR auto operator[](std::size_t idx) noexcept -> RowT &
+         {
+             return row(idx);
+         }
+ 
+-        inline constexpr auto broadcast(std::size_t idx) const noexcept -> Vector<S, 1, S::VectorWidth>
++        inline VAMP_CONSTEXPR auto broadcast(std::size_t idx) const noexcept -> Vector<S, 1, S::VectorWidth>
+         {
+             auto [v_idx, v_offset] = utils::c_div(idx, S::VectorWidth);
+             return Vector<S, 1, S::VectorWidth>({S::broadcast(data[v_idx], v_offset)});
+@@ -991,45 +992,45 @@ namespace vamp
+     }  // namespace
+ 
+     template <typename VectorIT, typename = std::enable_if_t<is_vector<VectorIT>::value, bool>>
+-    inline constexpr auto operator/(typename VectorIT::S::ScalarT s, VectorIT v) noexcept -> VectorIT
++    inline VAMP_CONSTEXPR auto operator/(typename VectorIT::S::ScalarT s, VectorIT v) noexcept -> VectorIT
+     {
+         // TODO: Make a broadcast_scalar-based version of this
+         return VectorIT{VectorIT::fill(s)} / v;
+     }
+ 
+     template <typename VectorIT, typename = std::enable_if_t<is_vector<VectorIT>::value, bool>>
+-    inline constexpr auto operator*(typename VectorIT::S::ScalarT s, VectorIT v) noexcept -> VectorIT
++    inline VAMP_CONSTEXPR auto operator*(typename VectorIT::S::ScalarT s, VectorIT v) noexcept -> VectorIT
+     {
+         return v * s;
+     }
+ 
+     template <typename VectorIT, typename = std::enable_if_t<is_vector<VectorIT>::value, bool>>
+-    inline constexpr auto operator+(typename VectorIT::S::ScalarT s, VectorIT v) noexcept -> VectorIT
++    inline VAMP_CONSTEXPR auto operator+(typename VectorIT::S::ScalarT s, VectorIT v) noexcept -> VectorIT
+     {
+         return v + s;
+     }
+ 
+     template <typename VectorIT, typename = std::enable_if_t<is_vector<VectorIT>::value, bool>>
+-    inline constexpr auto operator-(typename VectorIT::S::ScalarT s, VectorIT v) noexcept -> VectorIT
++    inline VAMP_CONSTEXPR auto operator-(typename VectorIT::S::ScalarT s, VectorIT v) noexcept -> VectorIT
+     {
+         // TODO: Make a broadcast_scalar-based version of this
+         return VectorIT{VectorIT::fill(s)} - v;
+     }
+ 
+     template <typename VectorIT, typename = std::enable_if_t<is_vector<VectorIT>::value, bool>>
+-    inline constexpr auto operator|(typename VectorIT::S::ScalarT s, VectorIT v) noexcept -> VectorIT
++    inline VAMP_CONSTEXPR auto operator|(typename VectorIT::S::ScalarT s, VectorIT v) noexcept -> VectorIT
+     {
+         return v | s;
+     }
+ 
+     template <typename VectorIT, typename = std::enable_if_t<is_vector<VectorIT>::value, bool>>
+-    inline constexpr auto operator&(typename VectorIT::S::ScalarT s, VectorIT v) noexcept -> VectorIT
++    inline VAMP_CONSTEXPR auto operator&(typename VectorIT::S::ScalarT s, VectorIT v) noexcept -> VectorIT
+     {
+         return v & s;
+     }
+ 
+     template <typename VectorIT, typename = std::enable_if_t<is_vector<VectorIT>::value, bool>>
+-    inline constexpr auto operator<<(std::ostream &o, VectorIT v) noexcept -> std::ostream &
++    inline VAMP_CONSTEXPR auto operator<<(std::ostream &o, VectorIT v) noexcept -> std::ostream &
+     {
+         o << "[";
+ 
+diff --git a/src/impl/vamp/vector/math.hh b/src/impl/vamp/vector/math.hh
+index 43c95d4..9cfbbf3 100644
+--- a/src/impl/vamp/vector/math.hh
++++ b/src/impl/vamp/vector/math.hh
+@@ -3,9 +3,12 @@
+ #include <Eigen/Dense>
+ #include <Eigen/Geometry>
+ #include <cmath>
++#include <vamp/compiler.hh>
+ 
++namespace vamp
++{
+ template <typename DataT>
+-inline constexpr auto sin(const DataT &v) -> DataT
++inline VAMP_CONSTEXPR auto sin(const DataT &v) -> DataT
+ {
+     if constexpr (std::is_arithmetic_v<DataT>)
+     {
+@@ -18,7 +21,7 @@ inline constexpr auto sin(const DataT &v) -> DataT
+ }
+ 
+ template <typename DataT>
+-inline constexpr auto cos(const DataT &v) -> DataT
++inline VAMP_CONSTEXPR auto cos(const DataT &v) -> DataT
+ {
+     if constexpr (std::is_arithmetic_v<DataT>)
+     {
+@@ -31,7 +34,7 @@ inline constexpr auto cos(const DataT &v) -> DataT
+ }
+ 
+ template <typename DataT>
+-inline constexpr auto sqrt(const DataT &v) -> DataT
++inline VAMP_CONSTEXPR auto sqrt(const DataT &v) -> DataT
+ {
+     return v.sqrt();
+ }
+@@ -48,4 +51,5 @@ inline static auto to_isometry(const DataT *buf) -> Eigen::Transform<DataT, 3, E
+     out.linear() = R;
+ 
+     return out;
+-}
+\ No newline at end of file
++}
++}  // namespace vamp
+\ No newline at end of file
+diff --git a/src/impl/vamp/vector/utils.hh b/src/impl/vamp/vector/utils.hh
+index 6e8e3fc..8032e5d 100644
+--- a/src/impl/vamp/vector/utils.hh
++++ b/src/impl/vamp/vector/utils.hh
+@@ -4,6 +4,7 @@
+ #include <functional>
+ #include <array>
+ 
++#include <vamp/compiler.hh>
+ #include <vamp/utils.hh>
+ 
+ namespace vamp
+@@ -141,32 +142,32 @@ namespace vamp
+         };
+ 
+         template <auto fn, typename DataT>
+-        inline constexpr auto apply() noexcept
++        inline VAMP_CONSTEXPR auto apply() noexcept
+         {
+             return applicator<fn, DataT>::run(std::make_index_sequence<data_size<DataT>()>());
+         }
+ 
+         template <auto fn, typename DataT>
+-        inline constexpr auto apply(DataT data) noexcept
++        inline VAMP_CONSTEXPR auto apply(DataT data) noexcept
+         {
+             return applicator<fn, DataT>::run(std::make_index_sequence<data_size<DataT>()>(), data);
+         }
+ 
+         template <auto fn, typename DataT>
+-        inline constexpr auto apply(DataT l_data, DataT r_data) noexcept
++        inline VAMP_CONSTEXPR auto apply(DataT l_data, DataT r_data) noexcept
+         {
+             return applicator<fn, DataT>::run(std::make_index_sequence<data_size<DataT>()>(), l_data, r_data);
+         }
+ 
+         template <auto fn, typename DataT>
+-        inline constexpr auto apply(DataT l_data, DataT r_data, DataT a_data) noexcept
++        inline VAMP_CONSTEXPR auto apply(DataT l_data, DataT r_data, DataT a_data) noexcept
+         {
+             return applicator<fn, DataT>::run(
+                 std::make_index_sequence<data_size<DataT>()>(), l_data, r_data, a_data);
+         }
+ 
+         template <auto fn, typename DataT, typename... FixedArgT>
+-        inline constexpr auto apply(DataT data, FixedArgT... fixed_args) noexcept
++        inline VAMP_CONSTEXPR auto apply(DataT data, FixedArgT... fixed_args) noexcept
+         {
+             return applicator<fn, DataT>::run(
+                 std::make_index_sequence<data_size<DataT>()>(), data, fixed_args...);
+@@ -175,7 +176,7 @@ namespace vamp
+         // HACK: This is a gross crufty hack to work around a problem with
+         // intersection(AVX intrinsics, template/overload resolution)
+         template <auto fn, typename IndexT, typename DataT, typename... FixedArgT>
+-        inline constexpr auto
++        inline VAMP_CONSTEXPR auto
+         apply_indexed(IndexT i_data, DataT m_data, DataT a_data, FixedArgT... fixed_args) noexcept
+         {
+             return applicator<fn, DataT>::run(
+@@ -183,7 +184,7 @@ namespace vamp
+         }
+ 
+         template <auto fn, typename IndexT, typename DataT, typename... FixedArgT>
+-        inline constexpr auto apply_indexed(IndexT i_data, FixedArgT... fixed_args) noexcept
++        inline VAMP_CONSTEXPR auto apply_indexed(IndexT i_data, FixedArgT... fixed_args) noexcept
+         {
+             return applicator<fn, DataT>::run(
+                 std::make_index_sequence<data_size<DataT>()>(), i_data, fixed_args...);

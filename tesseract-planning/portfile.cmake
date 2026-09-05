@@ -8,7 +8,101 @@ vcpkg_from_github(
     HEAD_REF master
     PATCHES
         fix-osqp-target.patch
+        use-ompl-config-target.patch
 )
+
+# VAMP-accelerated OMPL: extra sources plus profile/CMake hooks.
+file(COPY "${CMAKE_CURRENT_LIST_DIR}/files/vamp_support.h"
+     DESTINATION "${SOURCE_PATH}/motion_planners/ompl/include/tesseract/motion_planners/ompl")
+file(COPY "${CMAKE_CURRENT_LIST_DIR}/files/vamp_support.cpp"
+     DESTINATION "${SOURCE_PATH}/motion_planners/ompl/src")
+vcpkg_replace_string("${SOURCE_PATH}/motion_planners/ompl/CMakeLists.txt"
+    "    src/weighted_real_vector_state_sampler.cpp)"
+    "    src/weighted_real_vector_state_sampler.cpp
+    src/vamp_support.cpp)")
+vcpkg_replace_string("${SOURCE_PATH}/motion_planners/ompl/CMakeLists.txt"
+    [[target_include_directories(motion_planners_ompl SYSTEM PUBLIC ${OMPL_INCLUDE_DIRS})]]
+    [[target_include_directories(motion_planners_ompl SYSTEM PUBLIC ${OMPL_INCLUDE_DIRS})
+if(MSVC)
+  set_source_files_properties(src/vamp_support.cpp PROPERTIES COMPILE_OPTIONS "/arch:AVX2;/permissive-;/bigobj")
+endif()
+target_link_libraries(motion_planners_ompl PRIVATE simdxorshift)]])
+vcpkg_replace_string("${SOURCE_PATH}/motion_planners/ompl/include/tesseract/motion_planners/ompl/profile/ompl_real_vector_move_profile.h"
+    "  /** @brief The collision check configuration */
+  tesseract::collision::CollisionCheckConfig collision_check_config;"
+    "  /** @brief The collision check configuration */
+  tesseract::collision::CollisionCheckConfig collision_check_config;
+
+  /**
+   * @brief Use OMPL VAMP SIMD collision checking when the manipulator matches a
+   * built-in VAMP robot (Panda, UR5, Fetch) with the same joint names and order.
+   * Falls back to Tesseract collision if the robot is not supported.
+   */
+  bool use_vamp{ false };")
+vcpkg_replace_string("${SOURCE_PATH}/motion_planners/ompl/src/profile/ompl_real_vector_move_profile.cpp"
+    "#include <tesseract/motion_planners/ompl/profile/ompl_real_vector_move_profile.h>"
+    "#include <tesseract/motion_planners/ompl/profile/ompl_real_vector_move_profile.h>
+#include <tesseract/motion_planners/ompl/vamp_support.h>")
+vcpkg_replace_string("${SOURCE_PATH}/motion_planners/ompl/src/profile/ompl_real_vector_move_profile.cpp"
+    "    if (YAML::Node n = config[\"collision_check_config\"])
+      collision_check_config = n.as<tesseract::collision::CollisionCheckConfig>();"
+    "    if (YAML::Node n = config[\"collision_check_config\"])
+      collision_check_config = n.as<tesseract::collision::CollisionCheckConfig>();
+
+    if (YAML::Node n = config[\"use_vamp\"])
+      use_vamp = n.as<bool>();")
+vcpkg_replace_string("${SOURCE_PATH}/motion_planners/ompl/src/profile/ompl_real_vector_move_profile.cpp"
+    "  // Setup state validators
+  auto csvc = std::make_shared<CompoundStateValidator>();
+  ompl::base::StateValidityCheckerPtr svc_without_collision =
+      createStateValidator(*simple_setup, env, manip, state_extractor);
+  if (svc_without_collision != nullptr)
+    csvc->addStateValidator(svc_without_collision);
+
+  auto svc_collision = createCollisionStateValidator(*simple_setup, env, manip, state_extractor);
+  if (svc_collision != nullptr)
+    csvc->addStateValidator(std::move(svc_collision));
+
+  simple_setup->setStateValidityChecker(csvc);
+
+  // Setup motion validation (i.e. collision checking)
+  auto mv = createMotionValidator(*simple_setup, env, manip, state_extractor, svc_without_collision);
+  if (mv != nullptr)
+    simple_setup->getSpaceInformation()->setMotionValidator(std::move(mv));"
+    "  const bool vamp_on = use_vamp && tryEnableVampAcceleration(*simple_setup, *env, *manip);
+
+  if (!vamp_on)
+  {
+    // Setup state validators
+    auto csvc = std::make_shared<CompoundStateValidator>();
+    ompl::base::StateValidityCheckerPtr svc_without_collision =
+        createStateValidator(*simple_setup, env, manip, state_extractor);
+    if (svc_without_collision != nullptr)
+      csvc->addStateValidator(svc_without_collision);
+
+    auto svc_collision = createCollisionStateValidator(*simple_setup, env, manip, state_extractor);
+    if (svc_collision != nullptr)
+      csvc->addStateValidator(std::move(svc_collision));
+
+    simple_setup->setStateValidityChecker(csvc);
+
+    // Setup motion validation (i.e. collision checking)
+    auto mv = createMotionValidator(*simple_setup, env, manip, state_extractor, svc_without_collision);
+    if (mv != nullptr)
+      simple_setup->getSpaceInformation()->setMotionValidator(std::move(mv));
+  }")
+vcpkg_replace_string("${SOURCE_PATH}/motion_planners/ompl/src/profile/ompl_real_vector_move_profile.cpp"
+    "  equal &= (collision_check_config == rhs.collision_check_config);
+  return equal;"
+    "  equal &= (collision_check_config == rhs.collision_check_config);
+  equal &= (use_vamp == rhs.use_vamp);
+  return equal;")
+vcpkg_replace_string("${SOURCE_PATH}/motion_planners/ompl/include/tesseract/motion_planners/ompl/cereal_serialization.h"
+    "  ar(cereal::make_nvp(\"collision_check_config\", obj.collision_check_config));
+}"
+    "  ar(cereal::make_nvp(\"collision_check_config\", obj.collision_check_config));
+  ar(cereal::make_nvp(\"use_vamp\", obj.use_vamp));
+}")
 
 vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
     FEATURES
@@ -26,6 +120,7 @@ vcpkg_cmake_configure(
     OPTIONS
         ${FEATURE_OPTIONS}
         "-DCMAKE_PREFIX_PATH=${CURRENT_INSTALLED_DIR}"
+        "-Dtesseract_DIR=${CURRENT_INSTALLED_DIR}/share/tesseract-robotics"
         -DTESSERACT_ENABLE_TESTING=OFF
         -DTESSERACT_ENABLE_EXAMPLES=OFF
         -DTESSERACT_ENABLE_BENCHMARKING=OFF

@@ -39,6 +39,24 @@ vcpkg_cmake_install()
 vcpkg_copy_pdbs()
 vcpkg_cmake_config_fixup(PACKAGE_NAME tesseract CONFIG_PATH lib/cmake/tesseract)
 
+# opencv4[contrib] also installs TesseractConfig.cmake into share/tesseract.
+# On Windows, find_package(tesseract) matches that file (case-insensitive)
+# before tesseract-config.cmake. Keep this port's CMake files here instead.
+file(GLOB tess_cmake_files "${CURRENT_PACKAGES_DIR}/share/tesseract/*.cmake")
+file(MAKE_DIRECTORY "${CURRENT_PACKAGES_DIR}/share/${PORT}")
+file(COPY ${tess_cmake_files} DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}")
+file(REMOVE ${tess_cmake_files})
+if(NOT VCPKG_BUILD_TYPE)
+    file(GLOB tess_cmake_dbg "${CURRENT_PACKAGES_DIR}/debug/share/tesseract/*.cmake")
+    if(tess_cmake_dbg)
+        file(MAKE_DIRECTORY "${CURRENT_PACKAGES_DIR}/debug/share/${PORT}")
+        file(COPY ${tess_cmake_dbg} DESTINATION "${CURRENT_PACKAGES_DIR}/debug/share/${PORT}")
+        file(REMOVE ${tess_cmake_dbg})
+    endif()
+endif()
+file(WRITE "${CURRENT_PACKAGES_DIR}/share/${PORT}/tesseractConfig.cmake"
+    "include(\"\${CMAKE_CURRENT_LIST_DIR}/tesseract-config.cmake\")\n")
+
 file(REMOVE_RECURSE
     "${CURRENT_PACKAGES_DIR}/debug/include"
     "${CURRENT_PACKAGES_DIR}/debug/share"

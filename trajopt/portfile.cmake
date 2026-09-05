@@ -34,6 +34,7 @@ foreach(subdir IN LISTS TRAJOPT_SUBDIRS)
         LOGFILE_BASE "config-${TARGET_TRIPLET}-${logname}"
         OPTIONS
             "-DCMAKE_PREFIX_PATH=${prefix_path}"
+            "-Dtesseract_DIR=${CURRENT_INSTALLED_DIR}/share/tesseract-robotics"
             -DTRAJOPT_ENABLE_TESTING=OFF
             -DTRAJOPT_PACKAGE=OFF
             -DTRAJOPT_BUILD_qpOASES=OFF
@@ -49,6 +50,7 @@ foreach(subdir IN LISTS TRAJOPT_SUBDIRS)
             BUILD_IPOPT
             BUILD_SNOPT
             NO_OPENCL
+            tesseract_DIR
     )
     vcpkg_cmake_install()
 endforeach()

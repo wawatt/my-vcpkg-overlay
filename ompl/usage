@@ -1,0 +1,4 @@
+ompl is OMPL 2.0.2 + VAMP (Windows MSVC only, no Python). Overlay replaces registry ompl 1.7.0.
+
+  find_package(ompl CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE ompl::ompl)

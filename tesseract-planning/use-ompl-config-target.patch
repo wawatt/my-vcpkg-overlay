@@ -1,0 +1,19 @@
+diff --git a/motion_planners/ompl/CMakeLists.txt b/motion_planners/ompl/CMakeLists.txt
+index 1111111..2222222 100644
+--- a/motion_planners/ompl/CMakeLists.txt
++++ b/motion_planners/ompl/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-find_package(ompl REQUIRED)
++find_package(ompl CONFIG REQUIRED)
+ 
+ link_directories(BEFORE ${OMPL_LIBRARY_DIRS})
+ 
+@@ -25,7 +25,7 @@ target_link_libraries(
+   motion_planners_ompl
+   PUBLIC tesseract::motion_planners
+          tesseract::motion_planners_simple
+-         ${OMPL_LIBRARIES}
++         ompl::ompl
+          Boost::boost
+          cereal::cereal
+          ${CMAKE_THREAD_LIBS_INIT})

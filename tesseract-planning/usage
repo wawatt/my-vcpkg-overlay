@@ -1,7 +1,7 @@
-tesseract-planning provides CMake targets.
-The CMake package name is tesseract_planning (not the vcpkg port name):
+tesseract-planning provides CMake targets tesseract::*.
+Use the vcpkg port name (this pulls in tesseract-robotics, not OCR):
 
-  find_package(tesseract_planning CONFIG REQUIRED)
+  find_package(tesseract-planning CONFIG REQUIRED)
   target_link_libraries(main PRIVATE
       tesseract::command_language
       tesseract::motion_planners_ompl
@@ -9,4 +9,8 @@ The CMake package name is tesseract_planning (not the vcpkg port name):
       tesseract::motion_planners_descartes
       tesseract::task_composer)
 
-Config files live in share/tesseract_planning/. Plugin DLLs are in bin/; put that directory on PATH at runtime.
+OMPL VAMP SIMD (optional): set OMPLRealVectorMoveProfile::use_vamp = true when the
+manipulator joint names/order match a built-in VAMP robot (Panda, UR5, Fetch).
+Otherwise Tesseract collision is used.
+
+Plugin DLLs are in bin/; put that directory on PATH at runtime.

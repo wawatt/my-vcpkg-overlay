@@ -1,0 +1,11 @@
+# Stub copied from ports/ompl: this overlay does not build Python bindings.
+set(Python_FOUND FALSE)
+set(Python3_FOUND FALSE)
+set(PYTHONLIBS_FOUND FALSE)
+set(PYTHONINTERP_FOUND FALSE)
+function(find_python_module)
+endfunction()
+macro(find_boost_python)
+endmacro()
+macro(install_python)
+endmacro()
