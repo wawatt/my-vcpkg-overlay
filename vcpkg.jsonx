@@ -102,6 +102,7 @@
         "visualization"
       ]
     },
+    "osg-qt",
     "pinocchio3",
     "qt5-base",
     "qt5-svg",
