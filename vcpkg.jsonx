@@ -57,6 +57,7 @@
     "hpp-fcl",
     "jsoncpp",
     "libpcap",
+    "libssh",
     "libssh2",
     "lz4",
     "magic-enum",
@@ -64,6 +65,7 @@
     "nu-book-zxing-cpp",
     "octomap",
     "ompl",
+    "onnx",
     {
       "name": "opencv4",
       "features": [
@@ -97,6 +99,7 @@
     {
       "name": "pcl",
       "features": [
+        "cuda",
         "simulation",
         "surface-on-nurbs",
         "visualization"
@@ -114,7 +117,6 @@
     "sophus",
     "spdlog",
     "tesseract-planning",
-
     "tinyxml",
     "toppra",
     "urdfdom",
