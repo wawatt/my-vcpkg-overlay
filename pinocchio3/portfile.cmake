@@ -34,7 +34,8 @@ vcpkg_cmake_configure(
         -DBUILD_WITH_EXTRA_SUPPORT=ON 
         -DBUILD_WITH_OPENMP_SUPPORT=ON 
         -DBUILD_PYTHON_INTERFACE=OFF 
-        -DBUILD_WITH_AUTODIFF_SUPPORT=ON
+        -DBUILD_WITH_AUTODIFF_SUPPORT=OFF
+        -DBUILD_WITH_CPPAD_SUPPORT=OFF
         -DBUILD_TESTING=OFF 
         -DBUILD_WITH_COLLISION_SUPPORT=ON 
         -DBUILDING_ROS2_PACKAGE=OFF
@@ -49,8 +50,28 @@ vcpkg_cmake_install()
 vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake/pinocchio)
 vcpkg_copy_pdbs()
 
-file(COPY ${CURRENT_PACKAGES_DIR}/share/pinocchio/ DESTINATION ${CURRENT_PACKAGES_DIR}/share/pinocchio3)
-file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/share/pinocchio")
+if(EXISTS "${CURRENT_PACKAGES_DIR}/share/pinocchio")
+    file(COPY "${CURRENT_PACKAGES_DIR}/share/pinocchio/" DESTINATION "${CURRENT_PACKAGES_DIR}/share/pinocchio3")
+    file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/share/pinocchio")
+endif()
+
+if(EXISTS "${CURRENT_PACKAGES_DIR}/share/pinocchio3/pinocchioConfig.cmake")
+    vcpkg_replace_string(
+        "${CURRENT_PACKAGES_DIR}/share/pinocchio3/pinocchioConfig.cmake"
+        "\${PACKAGE_PREFIX_DIR}/lib/cmake/pinocchio/find-external/CppAD"
+        "\${CMAKE_CURRENT_LIST_DIR}/find-external/CppAD"
+        IGNORE_UNCHANGED
+    )
+endif()
+
+# Forwarding configs so find_package(pinocchio3) also works
+if(NOT EXISTS "${CURRENT_PACKAGES_DIR}/share/pinocchio3/pinocchio3Config.cmake")
+    file(WRITE "${CURRENT_PACKAGES_DIR}/share/pinocchio3/pinocchio3Config.cmake" "include(\"\${CMAKE_CURRENT_LIST_DIR}/pinocchioConfig.cmake\")\n")
+endif()
+if(NOT EXISTS "${CURRENT_PACKAGES_DIR}/share/pinocchio3/pinocchio3ConfigVersion.cmake")
+    file(WRITE "${CURRENT_PACKAGES_DIR}/share/pinocchio3/pinocchio3ConfigVersion.cmake" "include(\"\${CMAKE_CURRENT_LIST_DIR}/pinocchioConfigVersion.cmake\")\n")
+endif()
+
 file(RENAME ${CURRENT_PACKAGES_DIR}/lib/pkgconfig/pinocchio.pc ${CURRENT_PACKAGES_DIR}/lib/pkgconfig/pinocchio3.pc)
 
 # debug
