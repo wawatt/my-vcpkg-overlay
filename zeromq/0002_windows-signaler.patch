@@ -1,0 +1,50 @@
+# Related upstream fix: https://github.com/zeromq/libzmq/pull/4734
+# Retain IPC and epoll; use TCP fallback for the listed AF_UNIX connect errors.
+
+diff --git a/src/ip.cpp b/src/ip.cpp
+--- a/src/ip.cpp
++++ b/src/ip.cpp
+@@ -524,10 +524,12 @@
+ }
+ #endif
+ 
+ int zmq::make_fdpair (fd_t *r_, fd_t *w_)
+ {
++    // SLCOMM_WINDOWS_SIGNALER_FIX: a failed IPC pair must never expose garbage fds.
++    *r_ = *w_ = retired_fd;
+ #if defined ZMQ_HAVE_EVENTFD
+     int flags = 0;
+ #if defined ZMQ_HAVE_EVENTFD_CLOEXEC
+     //  Setting this option result in sane behaviour when exec() functions
+     //  are used. Old sockets are closed and don't block TCP ports, avoid
+@@ -604,10 +606,18 @@
+ 
+     //  Connect to the remote peer.
+     rc = ::connect (*w_, reinterpret_cast<const struct sockaddr *> (&lcladdr),
+                     lcladdr_len);
+     if (rc == -1) {
++        const int connect_error = WSAGetLastError ();
++        errno = wsa_error_to_errno (connect_error);
++        // AF_UNIX can bind/listen successfully yet reject connect at runtime.
++        // This is an internal wake-up channel; retain the existing TCP fallback.
++        ipc_fallback_on_tcpip = connect_error == WSAEINVAL
++                                || connect_error == WSAEAFNOSUPPORT
++                                || connect_error == WSAEPROTONOSUPPORT
++                                || connect_error == WSAEOPNOTSUPP;
+         goto error_closeclient;
+     }
+ 
+     *r_ = accept (listener, NULL, NULL);
+     errno_assert (*r_ != -1);
+@@ -629,10 +639,11 @@
+     return 0;
+ 
+ error_closeclient:
+     saved_errno = errno;
+     rc = closesocket (*w_);
++    *w_ = retired_fd;
+     wsa_assert (rc == 0);
+     errno = saved_errno;
+ 
+ error_closelistener:
+     saved_errno = errno;
