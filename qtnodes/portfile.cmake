@@ -25,6 +25,7 @@ vcpkg_cmake_configure(
         -DUSE_QT6=ON
         -DBUILD_SHARED_LIBS=OFF
         -DCMAKE_CXX_STANDARD=17
+        -DBUILD_EXAMPLES=OFF
     OPTIONS_DEBUG   
         -DBUILD_DEBUG_POSTFIX_D=ON
 )
