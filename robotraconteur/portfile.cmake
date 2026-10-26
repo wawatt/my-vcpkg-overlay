@@ -1,4 +1,4 @@
-vcpkg_check_features(OUT_FEATURE_FLAGS FEATURE_FLAGS
+vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
     FEATURES
         hardware-transport ROBOTRACONTEUR_ENABLE_HARDWARE_TRANSPORT
 )
