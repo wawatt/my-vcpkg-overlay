@@ -1,0 +1,121 @@
+--- a/RobotRaconteurCore/CMakeLists.txt
++++ b/RobotRaconteurCore/CMakeLists.txt
+@@ -1,4 +1,6 @@
+ set(BUILD_SHARED_LIBS FALSE CACHE BOOL "Build using shared Robot Raconteur core library")
++
++option(ROBOTRACONTEUR_ENABLE_HARDWARE_TRANSPORT "Build Linux hardware transport backends" ON)
+ 
+ set(RobotRaconteur_DISABLE_MESSAGE4 FALSE CACHE BOOL "Disable Robot Raconteur message version 3 by default")
+ set(RobotRaconteur_DISABLE_STRINGTABLE FALSE CACHE BOOL "Disable Robot Raconteur string table by default")
+@@ -32,11 +34,13 @@
+ endif()
+ 
+ if("${CMAKE_SYSTEM}" MATCHES "Linux" AND NOT ANDROID)
+-    find_path(DBUS_INCLUDE_DIR dbus.h NAMES dbus/dbus.h PATH_SUFFIXES dbus-1.0)
+-    find_library(DBUS_LIBRARY dbus-1)
+-    get_filename_component(DBUS_LIBRARY_DIR ${DBUS_LIBRARY} DIRECTORY)
+-    find_path(DBUS_INCLUDE_ARCH_DIR dbus/dbus-arch-deps.h HINTS ${DBUS_LIBRARY_DIR}/dbus-1.0/include)
+-    find_path(LIBUSB_INCLUDE_DIR libusb.h PATH_SUFFIXES libusb-1.0)
++    if(ROBOTRACONTEUR_ENABLE_HARDWARE_TRANSPORT)
++        find_path(DBUS_INCLUDE_DIR dbus.h NAMES dbus/dbus.h PATH_SUFFIXES dbus-1.0)
++        find_library(DBUS_LIBRARY dbus-1)
++        get_filename_component(DBUS_LIBRARY_DIR ${DBUS_LIBRARY} DIRECTORY)
++        find_path(DBUS_INCLUDE_ARCH_DIR dbus/dbus-arch-deps.h HINTS ${DBUS_LIBRARY_DIR}/dbus-1.0/include)
++        find_path(LIBUSB_INCLUDE_DIR libusb.h PATH_SUFFIXES libusb-1.0)
++    endif()
+     find_package(OpenSSL REQUIRED)
+ endif()
+ 
+@@ -205,6 +209,12 @@
+         src/HardwareTransport_libusb_private.h
+         src/LocalTransport_linux.cpp
+         src/LocalTransport_linux_private.h)
++    if(NOT ROBOTRACONTEUR_ENABLE_HARDWARE_TRANSPORT)
++        list(REMOVE_ITEM RobotRaconteurCore_src
++             src/HardwareTransport_linux.cpp src/HardwareTransport_linux_private.h
++             src/HardwareTransport_usbcommon.cpp src/HardwareTransport_usbcommon_private.h
++             src/HardwareTransport_libusb.cpp src/HardwareTransport_libusb_private.h)
++    endif()
+ endif()
+ 
+ if(APPLE)
+@@ -242,6 +252,10 @@
+ else()
+     add_library(RobotRaconteurCore STATIC ${RobotRaconteurCore_src} ${RobotRaconteurCore_header})
+     set_target_properties(RobotRaconteurCore PROPERTIES PREFIX lib)
++endif()
++
++if("${CMAKE_SYSTEM}" MATCHES "Linux" AND NOT ANDROID AND NOT ROBOTRACONTEUR_ENABLE_HARDWARE_TRANSPORT)
++    target_compile_definitions(RobotRaconteurCore PRIVATE ROBOTRACONTEUR_DISABLE_LINUX_HARDWARE_TRANSPORT)
+ endif()
+ 
+ if(NOT EMSCRIPTEN)
+@@ -324,13 +338,17 @@
+ if(UNIX AND NOT APPLE AND NOT ANDROID)
+     if(BUILD_SHARED_LIBS)
+ 
+-        target_include_directories(RobotRaconteurCore PRIVATE ${DBUS_INCLUDE_DIR} ${DBUS_INCLUDE_ARCH_DIR}
+-                                                              ${LIBUSB_INCLUDE_DIR})
++        if(ROBOTRACONTEUR_ENABLE_HARDWARE_TRANSPORT)
++            target_include_directories(RobotRaconteurCore PRIVATE ${DBUS_INCLUDE_DIR} ${DBUS_INCLUDE_ARCH_DIR}
++                                                                  ${LIBUSB_INCLUDE_DIR})
++        endif()
+         target_link_libraries(RobotRaconteurCore PRIVATE OpenSSL::SSL OpenSSL::Crypto ${CMAKE_DL_LIBS})
+         target_compile_definitions(RobotRaconteurCore PRIVATE ROBOTRACONTEUR_USE_OPENSSL)
+     else()
+-        target_include_directories(RobotRaconteurCore PRIVATE ${DBUS_INCLUDE_DIR} ${DBUS_INCLUDE_ARCH_DIR}
+-                                                              ${LIBUSB_INCLUDE_DIR})
++        if(ROBOTRACONTEUR_ENABLE_HARDWARE_TRANSPORT)
++            target_include_directories(RobotRaconteurCore PRIVATE ${DBUS_INCLUDE_DIR} ${DBUS_INCLUDE_ARCH_DIR}
++                                                                  ${LIBUSB_INCLUDE_DIR})
++        endif()
+         target_link_libraries(RobotRaconteurCore PUBLIC OpenSSL::SSL OpenSSL::Crypto ${CMAKE_DL_LIBS})
+         target_compile_definitions(RobotRaconteurCore PUBLIC ROBOTRACONTEUR_USE_OPENSSL)
+     endif()
+--- a/RobotRaconteurCore/src/HardwareTransport.cpp
++++ b/RobotRaconteurCore/src/HardwareTransport.cpp
+@@ -46,7 +46,7 @@
+ #include "HardwareTransport_win_private.h"
+ #endif
+ 
+-#if defined(ROBOTRACONTEUR_LINUX) && !defined(ROBOTRACONTEUR_ANDROID)
++#if defined(ROBOTRACONTEUR_LINUX) && !defined(ROBOTRACONTEUR_ANDROID) && !defined(ROBOTRACONTEUR_DISABLE_LINUX_HARDWARE_TRANSPORT)
+ #include "HardwareTransport_linux_private.h"
+ #endif
+ 
+@@ -96,7 +96,7 @@
+     }
+ #endif
+ 
+-#if defined(ROBOTRACONTEUR_LINUX) && !defined(ROBOTRACONTEUR_ANDROID)
++#if defined(ROBOTRACONTEUR_LINUX) && !defined(ROBOTRACONTEUR_ANDROID) && !defined(ROBOTRACONTEUR_DISABLE_LINUX_HARDWARE_TRANSPORT)
+     RR_SHARED_PTR<detail::DBus_Functions> f1 = RR_MAKE_SHARED<detail::DBus_Functions>();
+     if (f1->LoadFunctions())
+     {
+@@ -351,7 +351,7 @@
+             throw ConnectionException("Invalid connection transport");
+         }
+ 
+-#elif defined(ROBOTRACONTEUR_LINUX) && !defined(ROBOTRACONTEUR_ANDROID)
++#elif defined(ROBOTRACONTEUR_LINUX) && !defined(ROBOTRACONTEUR_ANDROID) && !defined(ROBOTRACONTEUR_DISABLE_LINUX_HARDWARE_TRANSPORT)
+         if (transport == "usb")
+         {
+             boost::optional<std::string> dev_path =
+@@ -741,7 +741,7 @@
+     }
+ 
+     d->GetAll(handler, timeout);
+-#elif defined(ROBOTRACONTEUR_LINUX) && !defined(ROBOTRACONTEUR_ANDROID)
++#elif defined(ROBOTRACONTEUR_LINUX) && !defined(ROBOTRACONTEUR_ANDROID) && !defined(ROBOTRACONTEUR_DISABLE_LINUX_HARDWARE_TRANSPORT)
+     RR_SHARED_PTR<detail::HardwareTransport_linux_discovery> d;
+ 
+     if (!internal3)
+@@ -962,7 +962,7 @@
+     }
+ #endif
+ 
+-#if defined(ROBOTRACONTEUR_LINUX) && !defined(ROBOTRACONTEUR_ANDROID)
++#if defined(ROBOTRACONTEUR_LINUX) && !defined(ROBOTRACONTEUR_ANDROID) && !defined(ROBOTRACONTEUR_DISABLE_LINUX_HARDWARE_TRANSPORT)
+     {
+         boost::mutex::scoped_lock lock(parameter_lock);
+         RR_SHARED_PTR<detail::LibUsbDeviceManager> m = RR_STATIC_POINTER_CAST<detail::LibUsbDeviceManager>(internal2);

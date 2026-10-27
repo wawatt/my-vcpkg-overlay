@@ -1,6 +1,7 @@
 {
   "name": "robotraconteur",
   "version-semver": "1.2.6",
+  "port-version": 2,
   "description": "The Robot Raconteur communication framework core library",
   "homepage": "https://www.robotraconteur.com",
   "license": "Apache-2.0",
@@ -50,7 +51,7 @@
   ],
   "features": {
     "hardware-transport": {
-      "description": "Enable HardwareTransport (USB, Bluetooth, PCIe)",
+      "description": "Enable Linux hardware backends (USB/Bluetooth/PCIe); other platforms retain upstream behavior",
       "dependencies": [
         {
           "name": "dbus",
